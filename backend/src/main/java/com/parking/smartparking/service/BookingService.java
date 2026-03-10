@@ -1,5 +1,6 @@
 package com.parking.smartparking.service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -50,6 +51,8 @@ public class BookingService {
     private final UserRepository userRepository;
     private final QRCodeService qrCodeService;
     private final WebSocketController webSocketController;
+        private final PricingService pricingService;
+        private final WalletService walletService;
 
     /**
      * ===== CORE LOGIC: TẠO BOOKING VỚI OPTIMISTIC LOCKING =====
@@ -186,6 +189,56 @@ public class BookingService {
 
         log.info("🚗 Check-in: Booking #{} → Slot [{}] OCCUPIED", bookingId, slot.getSlotName());
         return toResponse(booking, "Check-in thành công! Xe đã vào bãi.");
+    }
+
+    /**
+     * Check-out: Ra bãi, tính tiền động và trừ ví (Phase 4)
+     */
+    @Transactional
+    public BookingResponse checkOut(Long bookingId, String userEmail) {
+        Booking booking = bookingRepository.findByIdAndUser_Email(bookingId, userEmail)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy booking #" + bookingId));
+
+        if (booking.getStatus() != Booking.BookingStatus.CHECKED_IN) {
+            throw new RuntimeException(
+                    "Chỉ có thể check-out booking ở trạng thái CHECKED_IN (hiện tại: " + booking.getStatus() + ")");
+        }
+
+        if (booking.getCheckInTime() == null) {
+            throw new RuntimeException("Booking chưa có thời gian check-in hợp lệ.");
+        }
+
+        User user = booking.getUser();
+        LocalDateTime checkOutTime = LocalDateTime.now();
+        PricingService.PricingResult pricingResult = pricingService.calculateCheckoutAmount(booking, user, checkOutTime);
+
+        BigDecimal totalAmount = pricingResult.totalAmount();
+        if (totalAmount.signum() > 0) {
+            walletService.chargeForParking(
+                    user,
+                    totalAmount,
+                    String.format("Thanh toán booking #%d - slot %s", booking.getId(), booking.getParkingSlot().getSlotName()));
+        }
+
+        booking.setStatus(Booking.BookingStatus.COMPLETED);
+        booking.setCheckOutTime(checkOutTime);
+        booking.setTotalAmount(totalAmount);
+
+        ParkingSlot slot = booking.getParkingSlot();
+        slot.setStatus("AVAILABLE");
+        parkingSlotRepository.save(slot);
+        bookingRepository.save(booking);
+
+        webSocketController.sendSlotUpdate(toSlotResponse(slot));
+
+        String checkoutMessage = totalAmount.signum() > 0
+                ? String.format("Check-out thành công. Đã trừ %s VND từ ví. %s",
+                        totalAmount.toPlainString(), pricingResult.note())
+                : "Check-out thành công. " + pricingResult.note();
+
+        log.info("🏁 Check-out: Booking #{} → Slot [{}] AVAILABLE | total={}",
+                bookingId, slot.getSlotName(), totalAmount);
+        return toResponse(booking, checkoutMessage);
     }
 
     /**

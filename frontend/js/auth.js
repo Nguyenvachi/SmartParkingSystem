@@ -126,6 +126,55 @@ document.getElementById('registerForm')?.addEventListener('submit', async functi
 // 3. KIỂM TRA ĐĂNG NHẬP (Dùng trong dashboard)
 // ============================================
 
+function parseJwtPayload(token) {
+    if (!token || typeof token !== 'string') {
+        return null;
+    }
+
+    try {
+        const payloadBase64 = token.split('.')[1];
+        if (!payloadBase64) {
+            return null;
+        }
+
+        return JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+    } catch (err) {
+        console.warn('⚠️ Không parse được JWT payload:', err);
+        return null;
+    }
+}
+
+function hasValidToken(user) {
+    if (!user || !user.token) {
+        return false;
+    }
+
+    const payload = parseJwtPayload(user.token);
+    if (!payload || !payload.exp) {
+        return false;
+    }
+
+    return Date.now() < payload.exp * 1000;
+}
+
+function getStoredUser() {
+    try {
+        const raw = localStorage.getItem('user');
+        if (!raw) {
+            return null;
+        }
+        return JSON.parse(raw);
+    } catch (err) {
+        console.warn('⚠️ localStorage user bị lỗi, xóa session cũ', err);
+        localStorage.removeItem('user');
+        return null;
+    }
+}
+
+function clearInvalidSession() {
+    localStorage.removeItem('user');
+}
+
 function hydrateUserFromOAuth2QueryParams() {
     try {
         const urlParams = new URLSearchParams(window.location.search);
@@ -134,8 +183,9 @@ function hydrateUserFromOAuth2QueryParams() {
         const fullName = urlParams.get('fullName');
         const role = urlParams.get('role');
         const avatarUrl = urlParams.get('avatarUrl');
+        const token = urlParams.get('token');
 
-        if (!userId || !email) {
+        if (!userId || !email || !token) {
             return false;
         }
 
@@ -145,18 +195,25 @@ function hydrateUserFromOAuth2QueryParams() {
             fullName: typeof fullName === 'string' ? fullName : '',
             role: role || 'ROLE_USER',
             avatarUrl: avatarUrl || '',
+            token: token,
             loginMethod: 'GOOGLE'
         };
 
         // Normalize display name a bit (e.g., remove trailing "_918" if present)
         userData.fullName = formatDisplayName(userData);
 
+        if (!hasValidToken(userData)) {
+            console.warn('⚠️ OAuth2 redirect trả về token không hợp lệ hoặc đã hết hạn');
+            clearInvalidSession();
+            return false;
+        }
+
         localStorage.setItem('user', JSON.stringify(userData));
 
         // Strip query params but keep the current path (/dashboard or /dashboard.html)
         window.history.replaceState({}, document.title, window.location.pathname);
 
-        console.log('✅ Hydrated user from Google OAuth2 redirect:', userData);
+        console.log('✅ Hydrated user from Google OAuth2 redirect');
         return true;
     } catch (err) {
         console.warn('⚠️ Failed to hydrate user from OAuth2 params:', err);
@@ -181,17 +238,17 @@ function formatDisplayName(user) {
 }
 
 function checkAuth() {
-    const user = localStorage.getItem('user');
+    const user = getStoredUser();
 
-    if (!user) {
-        // Chưa đăng nhập -> Chuyển về login
+    if (!user || !hasValidToken(user)) {
+        clearInvalidSession();
         window.location.href = (typeof FRONTEND_LOGIN_URL !== 'undefined' && FRONTEND_LOGIN_URL)
             ? FRONTEND_LOGIN_URL
             : 'login.html';
         return null;
     }
 
-    return JSON.parse(user);
+    return user;
 }
 
 // ============================================
@@ -214,7 +271,7 @@ function updateUserInfo() {
 // 5. ĐĂNG XUẤT
 // ============================================
 
-document.querySelector('.btn-outline-light')?.addEventListener('click', function () {
+document.getElementById('btnLogout')?.addEventListener('click', function () {
     if (confirm('Bạn có chắc muốn đăng xuất?')) {
         localStorage.removeItem('user');
         window.location.href = (typeof FRONTEND_LOGIN_URL !== 'undefined' && FRONTEND_LOGIN_URL)
@@ -262,8 +319,8 @@ function showAlert(type, message) {
 document.addEventListener('DOMContentLoaded', function () {
     // Nếu đã đăng nhập mà vẫn vào /login -> đẩy sang dashboard
     if (window.location.pathname.includes('login')) {
-        const existingUser = localStorage.getItem('user');
-        if (existingUser) {
+        const existingUser = getStoredUser();
+        if (existingUser && hasValidToken(existingUser)) {
             window.location.replace(
                 (typeof FRONTEND_DASHBOARD_URL !== 'undefined' && FRONTEND_DASHBOARD_URL)
                     ? FRONTEND_DASHBOARD_URL
@@ -271,12 +328,23 @@ document.addEventListener('DOMContentLoaded', function () {
             );
             return;
         }
+
+        if (existingUser && !hasValidToken(existingUser)) {
+            clearInvalidSession();
+        }
     }
 
     // Nếu đang ở dashboard -> Kiểm tra auth
     if (window.location.pathname.includes('dashboard')) {
         // Ensure OAuth2 redirect params are processed before auth guard
-        hydrateUserFromOAuth2QueryParams();
+        const hydrated = hydrateUserFromOAuth2QueryParams();
+        if (!hydrated) {
+            const existingUser = getStoredUser();
+            if (!existingUser || !hasValidToken(existingUser)) {
+                clearInvalidSession();
+            }
+        }
+
         updateUserInfo();
     }
 });

@@ -38,12 +38,19 @@
 
         // Nút "Dashboard (Demo)" - Kiểm tra auth trước
         document.getElementById('btnDashboard').addEventListener('click', function () {
-            const user = localStorage.getItem('user');
+            let user = null;
 
-            if (user) {
+            try {
+                user = JSON.parse(localStorage.getItem('user') || 'null');
+            } catch (e) {
+                localStorage.removeItem('user');
+            }
+
+            if (user && user.token) {
                 // Đã đăng nhập -> Vào dashboard
                 window.location.href = '/dashboard';
             } else {
+                localStorage.removeItem('user');
                 // Chưa đăng nhập -> Hỏi có muốn đăng nhập không
                 if (confirm('Bạn cần đăng nhập để truy cập Dashboard.\n\nChuyển đến trang đăng nhập?')) {
                     window.location.href = '/login';

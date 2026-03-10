@@ -1,15 +1,26 @@
 package com.parking.smartparking.controller;
 
-import com.parking.smartparking.dto.request.ParkingSlotRequest;
-import com.parking.smartparking.dto.response.ParkingSlotResponse;
-import com.parking.smartparking.service.ParkingSlotService;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
+import com.parking.smartparking.dto.request.ParkingSlotRequest;
+import com.parking.smartparking.dto.response.ParkingRecommendationResponse;
+import com.parking.smartparking.dto.response.ParkingSlotResponse;
+import com.parking.smartparking.service.ParkingSlotService;
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 
 /**
  * REST API Controller cho Parking Slot Management
@@ -71,6 +82,13 @@ public class ParkingSlotController {
     public ResponseEntity<ParkingSlotResponse> getSlotById(@PathVariable Long id) {
         ParkingSlotResponse slot = parkingSlotService.getSlotById(id);
         return ResponseEntity.ok(slot);
+    }
+
+    @GetMapping("/recommendation")
+    public ResponseEntity<ParkingRecommendationResponse> recommendSlot(
+            @RequestParam(required = false) String vehicleType) {
+        ParkingRecommendationResponse recommendation = parkingSlotService.recommendSlot(vehicleType);
+        return ResponseEntity.ok(recommendation);
     }
 
     /**

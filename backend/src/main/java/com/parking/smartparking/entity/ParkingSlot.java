@@ -1,8 +1,19 @@
 package com.parking.smartparking.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
 import java.math.BigDecimal;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * Entity ParkingSlot - Ánh xạ bảng 'parking_slots' trong Database Phục vụ cho
@@ -28,9 +39,11 @@ public class ParkingSlot {
     @Column(nullable = false, length = 20)
     private String type; // SEDAN (Xe con), SUV (Xe lớn)
 
+    @Builder.Default
     @Column(length = 20)
     private String status = "AVAILABLE"; // AVAILABLE, RESERVED, OCCUPIED, MAINTENANCE
 
+    @Builder.Default
     @Column(name = "price_per_hour", precision = 10, scale = 2)
     private BigDecimal pricePerHour = BigDecimal.valueOf(5000.00);
 
