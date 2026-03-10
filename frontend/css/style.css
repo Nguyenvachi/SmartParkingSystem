@@ -1,0 +1,194 @@
+/**
+ * CSS cho Smart Parking Dashboard
+ * Tính năng #5 - Real-time Map Update (UI)
+ */
+
+/* ============================================
+   1. PARKING SLOT STYLES (LƯỚi BÃI XE)
+   ============================================ */
+
+.parking-slot {
+    width: 120px;
+    height: 100px;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.parking-slot:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.slot-name {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.slot-status {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ============================================
+   2. TRẠNG THÁI SLOT (MÀU SẮC)
+   ============================================ */
+
+/* AVAILABLE - Trống (Xanh lá) */
+.slot-available {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    border-color: #28a745;
+    color: #155724;
+}
+
+.slot-available:hover {
+    background: linear-gradient(135deg, #c3e6cb 0%, #b1dfbb 100%);
+    border-color: #218838;
+}
+
+/* RESERVED - Đã đặt (Vàng) */
+.slot-reserved {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border-color: #ffc107;
+    color: #856404;
+    cursor: not-allowed;
+}
+
+/* OCCUPIED - Đang đỗ (Đỏ) */
+.slot-occupied {
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+    border-color: #dc3545;
+    color: #721c24;
+    cursor: not-allowed;
+}
+
+/* MAINTENANCE - Bảo trì (Xám) */
+.slot-maintenance {
+    background: linear-gradient(135deg, #e2e3e5 0%, #d6d8db 100%);
+    border-color: #6c757d;
+    color: #383d41;
+    cursor: not-allowed;
+}
+
+/* ============================================
+   3. ANIMATIONS (HIỆU ỨNG CHUYỂN ĐỔI)
+   ============================================ */
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.parking-slot.updating {
+    animation: pulse 1s ease-in-out;
+}
+
+/* ============================================
+   4. RESPONSIVE (MOBILE)
+   ============================================ */
+
+@media (max-width: 768px) {
+    .parking-slot {
+        width: 70px;
+        height: 70px;
+    }
+    
+    .slot-name {
+        font-size: 14px;
+    }
+    
+    .slot-status {
+        font-size: 10px;
+    }
+}
+
+/* ============================================
+   5. UTILITY CLASSES
+   ============================================ */
+
+.text-success-dark {
+    color: #155724;
+}
+
+.text-warning-dark {
+    color: #856404;
+}
+
+.text-danger-dark {
+    color: #721c24;
+}
+
+.text-secondary-dark {
+    color: #383d41;
+}
+
+/* ============================================
+   6. PHASE 3 — BOOKING & QR CODE STYLES
+   ============================================ */
+
+/* Booking history card in sidebar */
+.booking-card {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    font-size: 0.82rem;
+    transition: box-shadow 0.2s ease;
+}
+
+.booking-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.btn-xs {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    line-height: 1.4;
+}
+
+/* QR code container in modal */
+.qr-container {
+    width: 230px;
+    height: 230px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+    border-radius: 12px;
+    border: 2px dashed #ccc;
+}
+
+.qr-placeholder {
+    text-align: center;
+    color: #adb5bd;
+}
+
+/* Parking slot selected highlight */
+.parking-slot.slot-selected {
+    outline: 3px solid #0d6efd;
+    outline-offset: 2px;
+    transform: scale(1.06);
+}
+
+/* History tab scrollable list */
+#bookingHistoryList {
+    max-height: 420px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+/* Sidebar tab compact styling */
+#sidebarTabs .nav-link {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.75rem;
+}

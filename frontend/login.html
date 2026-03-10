@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng Nhập - Smart Parking</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+</head>
+
+<body class="bg-light d-flex align-items-center py-4 bg-body-tertiary">
+
+    <main class="form-signin w-100 m-auto" style="max-width: 400px; padding: 15px;">
+        <div class="card shadow-lg border-0 rounded-4">
+            <div class="card-body p-5">
+                <h2 class="h3 mb-3 fw-normal text-center">Đăng nhập</h2>
+
+                <form id="loginForm">
+                    <div class="form-floating mb-3">
+                        <input type="email" class="form-control" id="floatingInput" placeholder="name@example.com">
+                        <label for="floatingInput">Email</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input type="password" class="form-control" id="floatingPassword" placeholder="Password">
+                        <label for="floatingPassword">Mật khẩu</label>
+                    </div>
+
+                    <div class="form-check text-start my-3">
+                        <input class="form-check-input" type="checkbox" value="remember-me" id="flexCheckDefault">
+                        <label class="form-check-label" for="flexCheckDefault">
+                            Ghi nhớ tôi
+                        </label>
+                    </div>
+                    <button class="btn btn-primary w-100 py-2 rounded-3" type="submit">Đăng nhập</button>
+
+                    <div class="text-center mt-3">
+                        <a href="#" class="small text-muted">Quên mật khẩu?</a>
+                    </div>
+                </form>
+
+                <!-- Nút Google NGOÀI form để tránh bị submit chặn -->
+                <hr class="my-3">
+                <a href="index.html" class="small text-muted d-block text-center mb-2">← Quay lại trang chủ</a>
+                <a id="googleLoginBtn" class="btn btn-outline-danger w-100" href="http://localhost:8080/oauth2/authorization/google">
+                    <i class="bi bi-google"></i> Đăng nhập bằng Google
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Config -->
+    <script src="js/config.js"></script>
+
+    <!-- Auth Logic -->
+    <script src="js/auth.js"></script>
+
+    <!-- Thông báo khi bị redirect do token hết hạn -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const reason = new URLSearchParams(window.location.search).get('reason');
+            if (reason === 'expired') {
+                const container = document.querySelector('.card-body') || document.querySelector('main');
+                if (container) {
+                    const alert = document.createElement('div');
+                    alert.className = 'alert alert-warning alert-dismissible fade show mt-2';
+                    alert.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i><strong>Phiên đăng nhập hết hạn.</strong> Vui lòng đăng nhập lại.<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+                    container.insertBefore(alert, container.firstChild);
+                }
+            }
+        });
+    </script>
+
+</body>
+
+</html>
