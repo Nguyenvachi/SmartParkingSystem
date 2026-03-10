@@ -37,10 +37,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // Phase 4
     loadRecommendation();
     loadWalletSummary();
+    loadAvailableVouchers();
 
     document.getElementById('topUpForm')?.addEventListener('submit', async function (event) {
         event.preventDefault();
         await topUpWallet();
+    });
+
+    document.getElementById('ocrForm')?.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        await simulateOcr();
     });
 });
 
@@ -397,7 +403,12 @@ async function cancelBooking(bookingId) {
 }
 
 async function doCheckOut(bookingId) {
-    if (!confirm('Xác nhận check-out và thanh toán bằng ví?')) return;
+    const voucherInput = document.getElementById(`voucherCode-${bookingId}`);
+    const voucherCode = voucherInput ? voucherInput.value.trim() : '';
+    const confirmMessage = voucherCode
+        ? `Xác nhận check-out và áp dụng voucher ${voucherCode}?`
+        : 'Xác nhận check-out và thanh toán bằng ví?';
+    if (!confirm(confirmMessage)) return;
 
     const user = (typeof getStoredUser === 'function')
         ? getStoredUser()
@@ -407,7 +418,11 @@ async function doCheckOut(bookingId) {
     try {
         const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/checkout`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${user.token}` }
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${user.token}`
+            },
+            body: JSON.stringify({ voucherCode })
         });
         const data = await res.json();
         if (res.status === 401) { handleUnauthorized(); return; }
@@ -416,6 +431,7 @@ async function doCheckOut(bookingId) {
         showToast('success', data.message || `Check-out thành công cho booking #${bookingId}`);
         loadBookingHistory();
         loadWalletSummary();
+        loadAvailableVouchers();
     } catch (err) {
         showToast('danger', err.message);
     }
@@ -471,6 +487,7 @@ async function loadBookingHistory() {
                             </button>
                         ` : ''}
                         ${b.status === 'CHECKED_IN' ? `
+                            <input class="form-control form-control-sm" id="voucherCode-${b.bookingId}" placeholder="Voucher (tùy chọn)">
                             <button class="btn btn-xs btn-primary py-0 px-1" onclick="doCheckOut(${b.bookingId})" title="Check-out">
                                 <i class="bi bi-box-arrow-right"></i>
                             </button>
@@ -675,6 +692,80 @@ async function purchaseMembership() {
         loadWalletSummary();
     } catch (err) {
         showToast('danger', err.message);
+    }
+}
+
+async function loadAvailableVouchers() {
+    const panel = document.getElementById('voucherListPanel');
+    if (!panel) return;
+
+    const user = (typeof getStoredUser === 'function')
+        ? getStoredUser()
+        : JSON.parse(localStorage.getItem('user') || 'null');
+    if (!user || !user.token) return;
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/vouchers/available`, {
+            headers: { 'Authorization': `Bearer ${user.token}` }
+        });
+        const data = await res.json();
+        if (res.status === 401) { handleUnauthorized(); return; }
+        if (!res.ok) throw new Error(data.message || 'Không tải được voucher');
+
+        if (!data || data.length === 0) {
+            panel.innerHTML = '<div class="text-muted small">Chưa có voucher khả dụng.</div>';
+            return;
+        }
+
+        panel.innerHTML = data.map(voucher => `
+            <div class="border rounded p-2 mb-2 bg-light">
+                <div class="fw-semibold text-primary">${voucher.code}</div>
+                <div class="small">${voucher.description}</div>
+                <div class="small text-muted">Giảm: ${voucher.discountType === 'PERCENT' ? voucher.discountValue + '%' : formatCurrency(voucher.discountValue)} • Còn lại: ${voucher.remainingUses}</div>
+            </div>
+        `).join('');
+    } catch (err) {
+        panel.innerHTML = `<div class="text-danger small">${err.message}</div>`;
+    }
+}
+
+async function simulateOcr() {
+    const input = document.getElementById('ocrImageInput');
+    const panel = document.getElementById('ocrResultPanel');
+    const user = (typeof getStoredUser === 'function')
+        ? getStoredUser()
+        : JSON.parse(localStorage.getItem('user') || 'null');
+
+    if (!user || !user.token) return;
+    if (!input?.files?.length) {
+        showToast('warning', 'Vui lòng chọn ảnh xe để mô phỏng OCR.');
+        return;
+    }
+
+    panel.innerHTML = '<div class="text-muted">Đang phân tích ảnh biển số...</div>';
+
+    try {
+        const formData = new FormData();
+        formData.append('image', input.files[0]);
+
+        const res = await fetch(`${API_BASE_URL}/ocr/simulate`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${user.token}` },
+            body: formData
+        });
+        const data = await res.json();
+        if (res.status === 401) { handleUnauthorized(); return; }
+        if (!res.ok) throw new Error(data.message || 'OCR simulation thất bại');
+
+        panel.innerHTML = `
+            <div class="alert alert-success py-2 mb-0 small">
+                <div><strong>Biển số:</strong> ${data.detectedPlate}</div>
+                <div><strong>Confidence:</strong> ${Math.round(Number(data.confidence || 0) * 100)}%</div>
+                <div class="text-muted">${data.message}</div>
+            </div>
+        `;
+    } catch (err) {
+        panel.innerHTML = `<div class="text-danger small">${err.message}</div>`;
     }
 }
 

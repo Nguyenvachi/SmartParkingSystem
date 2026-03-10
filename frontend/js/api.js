@@ -207,8 +207,11 @@ const BookingAPI = {
     /**
      * Check-out ra bãi và thanh toán bằng ví
      */
-    checkOut: async (bookingId) => {
-        return await apiRequest(`/bookings/${bookingId}/checkout`, { method: 'POST' });
+    checkOut: async (bookingId, voucherCode = '') => {
+        return await apiRequest(`/bookings/${bookingId}/checkout`, {
+            method: 'POST',
+            body: JSON.stringify({ voucherCode })
+        });
     },
 
     /**
@@ -250,4 +253,32 @@ SlotAPI.getRecommendation = async (vehicleType = null) => {
     return await apiRequest(`/slots/recommendation${queryParam}`, {
         method: 'GET'
     });
+};
+
+const VoucherAPI = {
+    getAvailable: async () => {
+        return await apiRequest('/vouchers/available', { method: 'GET' });
+    }
+};
+
+const OcrAPI = {
+    simulate: async (file) => {
+        const formData = new FormData();
+        formData.append('image', file);
+
+        const user = getStoredUser();
+        const response = await fetch(`${API_BASE_URL}/ocr/simulate`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${user?.token || ''}`
+            },
+            body: formData
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || 'OCR simulation thất bại');
+        }
+        return data;
+    }
 };

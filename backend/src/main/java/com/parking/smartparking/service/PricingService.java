@@ -71,11 +71,18 @@ public class PricingService {
 
         LocalDateTime cursor = chargeableStart;
         BigDecimal total = BigDecimal.ZERO;
+        LocalDateTime longStayBoundary = chargeableStart.plusHours(longStayThresholdHours);
 
         while (cursor.isBefore(chargeableEnd)) {
-            LocalDateTime next = cursor.plusHours(1);
-            if (next.isAfter(chargeableEnd)) {
-                next = chargeableEnd;
+            LocalDateTime next = chargeableEnd;
+
+            LocalDateTime nextPricingBoundary = getNextPricingBoundary(cursor);
+            if (nextPricingBoundary.isAfter(cursor) && nextPricingBoundary.isBefore(next)) {
+                next = nextPricingBoundary;
+            }
+
+            if (cursor.isBefore(longStayBoundary) && longStayBoundary.isBefore(next)) {
+                next = longStayBoundary;
             }
 
             long minutes = Duration.between(cursor, next).toMinutes();
@@ -87,8 +94,7 @@ public class PricingService {
                 chunkPrice = chunkPrice.multiply(nightMultiplier);
             }
 
-            long elapsedHours = Duration.between(chargeableStart, cursor).toHours();
-            if (elapsedHours >= longStayThresholdHours) {
+            if (!cursor.isBefore(longStayBoundary)) {
                 chunkPrice = chunkPrice.multiply(longStayMultiplier);
             }
 
@@ -102,6 +108,21 @@ public class PricingService {
     private boolean isNightWindow(LocalDateTime time) {
         int hour = time.getHour();
         return hour < dayStartHour || hour >= nightStartHour;
+    }
+
+    private LocalDateTime getNextPricingBoundary(LocalDateTime time) {
+        LocalDateTime dayBoundary = time.withHour(dayStartHour).withMinute(0).withSecond(0).withNano(0);
+        LocalDateTime nightBoundary = time.withHour(nightStartHour).withMinute(0).withSecond(0).withNano(0);
+
+        if (time.isBefore(dayBoundary)) {
+            return dayBoundary;
+        }
+
+        if (time.isBefore(nightBoundary)) {
+            return nightBoundary;
+        }
+
+        return dayBoundary.plusDays(1);
     }
 
     public record PricingResult(BigDecimal totalAmount, LocalDateTime chargeableFrom, String note) {

@@ -45,6 +45,8 @@ public class BookingResponse {
 
     // Tài chính (Phase 4 sẽ bổ sung)
     private BigDecimal totalAmount;
+    private BigDecimal discountAmount;
+    private String appliedVoucherCode;
 
     /**
      * QR Code dạng Base64 PNG (Tech Key #7) Frontend render:
