@@ -1,6 +1,7 @@
 package com.parking.smartparking.config;
 
 import java.util.Arrays;
+import java.util.Locale;
 
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.parking.smartparking.service.AuditLogService;
 
@@ -79,10 +81,30 @@ public class AuditLogAspect {
                 continue;
             }
             String parameterName = parameterNames != null && parameterNames.length > index ? parameterNames[index] : "arg" + index;
-            builder.append(parameterName).append('=').append(args[index]).append(';');
+            builder.append(parameterName).append('=').append(safeValue(parameterName, args[index])).append(';');
         }
 
         return trimDetails(builder.length() > 0 ? builder.toString() : Arrays.toString(args));
+    }
+
+    private String safeValue(String parameterName, Object value) {
+        if (value == null) {
+            return "null";
+        }
+
+        String normalizedName = parameterName.toLowerCase(Locale.ROOT);
+        if (normalizedName.contains("password")
+                || normalizedName.contains("token")
+                || normalizedName.contains("secret")
+                || normalizedName.contains("authorization")) {
+            return "[REDACTED]";
+        }
+
+        if (value instanceof MultipartFile multipartFile) {
+            return "MultipartFile(" + multipartFile.getOriginalFilename() + ")";
+        }
+
+        return String.valueOf(value);
     }
 
     private String trimDetails(String details) {

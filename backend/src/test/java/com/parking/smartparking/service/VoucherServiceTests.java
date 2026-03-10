@@ -19,6 +19,7 @@ import com.parking.smartparking.entity.Voucher;
 import com.parking.smartparking.repository.VoucherRepository;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings({"null", "unused"})
 class VoucherServiceTests {
 
     @Mock
@@ -55,6 +56,30 @@ class VoucherServiceTests {
         assertEquals(0, voucher.getRemainingUses());
         assertEquals(false, voucher.getActive());
         verify(voucherRepository).save(any(Voucher.class));
+    }
+
+    @Test
+    void shouldRejectVoucherOnSecondAttemptAfterLastUseWasConsumed() {
+        Voucher voucher = Voucher.builder()
+                .code("FLASH1")
+                .discountType(Voucher.DiscountType.FIXED)
+                .discountValue(new BigDecimal("15000"))
+                .minOrderAmount(new BigDecimal("15000"))
+                .maxDiscountAmount(new BigDecimal("15000"))
+                .remainingUses(1)
+                .active(true)
+                .validUntil(LocalDateTime.now().plusDays(2))
+                .description("Last use")
+                .build();
+
+        when(voucherRepository.findByCodeForUpdate("FLASH1")).thenReturn(Optional.of(voucher));
+
+        voucherService.applyVoucherToAmount("FLASH1", new BigDecimal("50000"));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> voucherService.applyVoucherToAmount("FLASH1", new BigDecimal("50000")));
+
+        assertEquals("Voucher FLASH1 hiện không còn khả dụng.", exception.getMessage());
     }
 
     @Test

@@ -182,6 +182,7 @@ function hydrateUserFromOAuth2QueryParams() {
         const email = urlParams.get('email');
         const fullName = urlParams.get('fullName');
         const role = urlParams.get('role');
+        const branchCode = urlParams.get('branchCode');
         const avatarUrl = urlParams.get('avatarUrl');
         const token = urlParams.get('token');
 
@@ -194,6 +195,7 @@ function hydrateUserFromOAuth2QueryParams() {
             email: email,
             fullName: typeof fullName === 'string' ? fullName : '',
             role: role || 'ROLE_USER',
+            branchCode: branchCode || '',
             avatarUrl: avatarUrl || '',
             token: token,
             loginMethod: 'GOOGLE'

@@ -4,10 +4,16 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.parking.smartparking.entity.User;
+
+import jakarta.persistence.LockModeType;
 
 /**
  * Repository cho Entity User Tầng giao tiếp với Database (Data Access Layer)
@@ -30,6 +36,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
      */
     Optional<User> findByEmail(String email);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.email = :email")
+    Optional<User> findByEmailForUpdate(@Param("email") String email);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.id = :id")
+    Optional<User> findByIdForUpdate(@Param("id") Long id);
+
     /**
      * Kiểm tra email đã tồn tại chưa (Dùng cho Register)
      *
@@ -41,4 +55,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByMembershipPlanAndAutoRenewMembershipTrueAndMembershipExpiryBefore(
             User.MembershipPlan membershipPlan,
             LocalDateTime time);
+
+    default List<User> findAllManagedUsers() {
+        return findAll(Sort.by(Sort.Order.asc("role"), Sort.Order.asc("fullName"), Sort.Order.asc("email")));
+    }
+
+    List<User> findByBranchCodeOrderByRoleAscFullNameAscEmailAsc(String branchCode);
 }

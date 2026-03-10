@@ -3,6 +3,7 @@ package com.parking.smartparking.service;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -13,7 +14,9 @@ import com.parking.smartparking.dto.request.ParkingSlotRequest;
 import com.parking.smartparking.dto.response.ParkingRecommendationResponse;
 import com.parking.smartparking.dto.response.ParkingSlotResponse;
 import com.parking.smartparking.entity.ParkingSlot;
+import com.parking.smartparking.entity.User;
 import com.parking.smartparking.repository.ParkingSlotRepository;
+import com.parking.smartparking.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -30,7 +33,11 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ParkingSlotService {
 
+    private static final int EXIT_WEIGHT = 5;
+    private static final int ELEVATOR_WEIGHT = 3;
+    private static final String DEFAULT_BRANCH = "MAIN";
     private final ParkingSlotRepository parkingSlotRepository;
+    private final UserRepository userRepository;
     // [FIX 3 - Tech #5 WebSocket] Inject để gửi real-time update khi slot thay đổi
     private final WebSocketController webSocketController;
 
@@ -39,8 +46,13 @@ public class ParkingSlotService {
      *
      * @return List<ParkingSlotResponse>
      */
-    public List<ParkingSlotResponse> getAllSlots() {
-        return parkingSlotRepository.findAll().stream()
+    public List<ParkingSlotResponse> getAllSlots(String requesterEmail) {
+        BranchAccess branchAccess = resolveBranchAccess(requesterEmail);
+        List<ParkingSlot> slots = branchAccess.restricted()
+                ? parkingSlotRepository.findAllVisibleByBranchCode(branchAccess.branchCode())
+                : parkingSlotRepository.findAll();
+
+        return slots.stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
@@ -51,52 +63,61 @@ public class ParkingSlotService {
      * @param status - AVAILABLE, RESERVED, OCCUPIED, MAINTENANCE
      * @return List<ParkingSlotResponse>
      */
-    public List<ParkingSlotResponse> getSlotsByStatus(String status) {
-        return parkingSlotRepository.findByStatus(status).stream()
+    public List<ParkingSlotResponse> getSlotsByStatus(String status, String requesterEmail) {
+        BranchAccess branchAccess = resolveBranchAccess(requesterEmail);
+        List<ParkingSlot> slots = branchAccess.restricted()
+                ? parkingSlotRepository.findByStatusVisibleByBranchCode(status, branchAccess.branchCode())
+                : parkingSlotRepository.findByStatus(status);
+
+        return slots.stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
 
-        public ParkingRecommendationResponse recommendSlot(String requestedType) {
+    public ParkingRecommendationResponse recommendSlot(String requestedType, String requesterEmail) {
         String normalizedType = normalizeVehicleType(requestedType);
+        BranchAccess branchAccess = resolveBranchAccess(requesterEmail);
 
-        List<ParkingSlot> availableSlots = parkingSlotRepository.findByStatusOrderBySlotNameAsc("AVAILABLE");
+        List<ParkingSlot> availableSlots = branchAccess.restricted()
+                ? parkingSlotRepository.findByStatusVisibleByBranchCode("AVAILABLE", branchAccess.branchCode())
+                : parkingSlotRepository.findByStatusOrderBySlotNameAsc("AVAILABLE");
         if (availableSlots.isEmpty()) {
             throw new RuntimeException("Hiện tại không còn slot AVAILABLE để gợi ý.");
         }
 
         List<ParkingSlot> typeMatchedSlots = normalizedType == null
-            ? availableSlots
-            : availableSlots.stream()
-                .filter(slot -> normalizedType.equalsIgnoreCase(slot.getType()))
-                .toList();
+                ? availableSlots
+                : availableSlots.stream()
+                        .filter(slot -> normalizedType.equalsIgnoreCase(slot.getType()))
+                        .toList();
 
         List<ParkingSlot> candidateSlots = typeMatchedSlots.isEmpty() ? availableSlots : typeMatchedSlots;
 
         List<ParkingSlotResponse> rankedSlots = candidateSlots.stream()
-            .sorted(Comparator
-                .comparingInt(this::recommendationScore)
-                .thenComparing(ParkingSlot::getSlotName))
-            .map(this::convertToResponse)
-            .toList();
+                .sorted(Comparator
+                        .comparingInt(this::recommendationScore)
+                        .thenComparing(ParkingSlot::getPricePerHour, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(ParkingSlot::getSlotName))
+                .map(this::convertToResponse)
+                .toList();
 
         ParkingSlotResponse recommendedSlot = rankedSlots.get(0);
         List<ParkingSlotResponse> alternativeSlots = rankedSlots.stream()
-            .skip(1)
-            .limit(3)
-            .toList();
+                .skip(1)
+                .limit(3)
+                .toList();
 
         String explanation = typeMatchedSlots.isEmpty() && normalizedType != null
-            ? "Không còn slot cùng loại xe, hệ thống đề xuất slot trống gần cổng nhất còn lại."
-            : "Ưu tiên slot trống gần cổng ra/thang máy nhất theo thứ tự bản đồ và đúng loại xe nếu có.";
+                ? "Không còn slot đúng loại xe, hệ thống fallback sang slot trống gần cổng ra và thang máy nhất."
+                : "Ưu tiên slot trống gần cổng ra và thang máy nhất, sau đó mới xét giá và thứ tự bản đồ.";
 
         return ParkingRecommendationResponse.builder()
-            .requestedType(normalizedType != null ? normalizedType : "ANY")
-            .recommendedSlot(recommendedSlot)
-            .alternativeSlots(alternativeSlots)
-            .explanation(explanation)
-            .build();
-        }
+                .requestedType(normalizedType != null ? normalizedType : "ANY")
+                .recommendedSlot(recommendedSlot)
+                .alternativeSlots(alternativeSlots)
+                .explanation(explanation)
+                .build();
+    }
 
     /**
      * Lấy thông tin 1 slot theo ID
@@ -105,8 +126,12 @@ public class ParkingSlotService {
      * @return ParkingSlotResponse
      * @throws RuntimeException nếu không tìm thấy
      */
-    public ParkingSlotResponse getSlotById(Long id) {
-        ParkingSlot slot = parkingSlotRepository.findById(id)
+    public ParkingSlotResponse getSlotById(Long id, String requesterEmail) {
+        Long requiredId = Objects.requireNonNull(id, "id không được null");
+        BranchAccess branchAccess = resolveBranchAccess(requesterEmail);
+        ParkingSlot slot = (branchAccess.restricted()
+                ? parkingSlotRepository.findByIdVisibleByBranchCode(requiredId, branchAccess.branchCode())
+                : parkingSlotRepository.findById(requiredId))
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy slot với ID: " + id));
         return convertToResponse(slot);
     }
@@ -119,11 +144,14 @@ public class ParkingSlotService {
      * @throws RuntimeException nếu slotName đã tồn tại
      */
     @Transactional
-    public ParkingSlotResponse createSlot(ParkingSlotRequest request) {
+    @SuppressWarnings("null")
+    public ParkingSlotResponse createSlot(ParkingSlotRequest request, String requesterEmail) {
         // Kiểm tra trùng tên slot
         if (parkingSlotRepository.findBySlotName(request.getSlotName()).isPresent()) {
             throw new RuntimeException("Slot " + request.getSlotName() + " đã tồn tại");
         }
+
+        String branchCode = resolveWritableBranch(request.getBranchCode(), requesterEmail, DEFAULT_BRANCH);
 
         // Tạo mới
         ParkingSlot slot = ParkingSlot.builder()
@@ -131,9 +159,10 @@ public class ParkingSlotService {
                 .type(request.getType())
                 .status(request.getStatus())
                 .pricePerHour(request.getPricePerHour())
+                .branchCode(branchCode)
                 .build();
 
-        ParkingSlot savedSlot = parkingSlotRepository.save(slot);
+        ParkingSlot savedSlot = Objects.requireNonNull(parkingSlotRepository.save(slot));
         ParkingSlotResponse response = convertToResponse(savedSlot);
         // [FIX 3 - Tech #5 WebSocket] Real-time: Thông báo slot mới được tạo
         webSocketController.sendSlotUpdate(response);
@@ -149,9 +178,11 @@ public class ParkingSlotService {
      * @throws RuntimeException nếu không tìm thấy
      */
     @Transactional
-    public ParkingSlotResponse updateSlot(Long id, ParkingSlotRequest request) {
-        ParkingSlot slot = parkingSlotRepository.findById(id)
+    public ParkingSlotResponse updateSlot(Long id, ParkingSlotRequest request, String requesterEmail) {
+        Long requiredId = Objects.requireNonNull(id, "id không được null");
+        ParkingSlot slot = parkingSlotRepository.findById(requiredId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy slot với ID: " + id));
+        enforceBranchAccess(slot, requesterEmail);
 
         // Kiểm tra nếu đổi tên slot mà tên mới đã tồn tại
         if (!slot.getSlotName().equals(request.getSlotName())
@@ -164,6 +195,7 @@ public class ParkingSlotService {
         slot.setType(request.getType());
         slot.setStatus(request.getStatus());
         slot.setPricePerHour(request.getPricePerHour());
+        slot.setBranchCode(resolveWritableBranch(request.getBranchCode(), requesterEmail, slot.getBranchCode()));
 
         ParkingSlot updatedSlot = parkingSlotRepository.save(slot);
         ParkingSlotResponse response = convertToResponse(updatedSlot);
@@ -179,7 +211,7 @@ public class ParkingSlotService {
      * @throws RuntimeException nếu không tìm thấy
      */
     @Transactional
-    public void deleteSlot(Long id) {
+    public void deleteSlot(Long id, String requesterEmail) {
         // [CU - Đã thay bằng findById để lấy thông tin gửi WebSocket]
         // if (!parkingSlotRepository.existsById(id)) {
         //     throw new RuntimeException("Không tìm thấy slot với ID: " + id);
@@ -187,10 +219,12 @@ public class ParkingSlotService {
         // parkingSlotRepository.deleteById(id);
 
         // [FIX 3 - Tech #5 WebSocket] Lấy slot trước khi xóa để gửi WS notification
-        ParkingSlot slot = parkingSlotRepository.findById(id)
+        Long requiredId = Objects.requireNonNull(id, "id không được null");
+        ParkingSlot slot = parkingSlotRepository.findById(requiredId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy slot với ID: " + id));
+        enforceBranchAccess(slot, requesterEmail);
 
-        parkingSlotRepository.deleteById(id);
+        parkingSlotRepository.deleteById(requiredId);
 
         // Broadcast trạng thái "DELETED" để Frontend xóa slot khỏi bản đồ ngậy lập tức
         webSocketController.sendSlotUpdate(ParkingSlotResponse.builder()
@@ -199,6 +233,7 @@ public class ParkingSlotService {
                 .type(slot.getType())
                 .status("DELETED")
                 .pricePerHour(slot.getPricePerHour())
+                .branchCode(normalizeBranchCode(slot.getBranchCode()))
                 .version(slot.getVersion())
                 .build());
     }
@@ -213,8 +248,55 @@ public class ParkingSlotService {
                 .type(slot.getType())
                 .status(slot.getStatus())
                 .pricePerHour(slot.getPricePerHour())
+                .branchCode(normalizeBranchCode(slot.getBranchCode()))
                 .version(slot.getVersion())
                 .build();
+    }
+
+    private BranchAccess resolveBranchAccess(String requesterEmail) {
+        if (requesterEmail == null || requesterEmail.isBlank()) {
+            return BranchAccess.unrestricted();
+        }
+
+        return userRepository.findByEmail(requesterEmail)
+                .filter(User::isAdmin)
+                .map(user -> {
+                    if (!user.isBranchAdmin()) {
+                        return BranchAccess.unrestricted();
+                    }
+                    return new BranchAccess(normalizeBranchCode(user.getBranchCode()), true);
+                })
+                .orElse(BranchAccess.unrestricted());
+    }
+
+    private void enforceBranchAccess(ParkingSlot slot, String requesterEmail) {
+        BranchAccess branchAccess = resolveBranchAccess(requesterEmail);
+        if (branchAccess.restricted() && !branchAccess.branchCode().equals(normalizeBranchCode(slot.getBranchCode()))) {
+            throw new RuntimeException("Admin chi nhánh chỉ được thao tác với slot thuộc chi nhánh của mình.");
+        }
+    }
+
+    private String resolveWritableBranch(String requestedBranchCode, String requesterEmail, String fallbackBranchCode) {
+        BranchAccess branchAccess = resolveBranchAccess(requesterEmail);
+        if (branchAccess.restricted()) {
+            if (requestedBranchCode != null && !requestedBranchCode.isBlank()
+                    && !branchAccess.branchCode().equals(normalizeBranchCode(requestedBranchCode))) {
+                throw new RuntimeException("Admin chi nhánh không được gán slot sang chi nhánh khác.");
+            }
+            return branchAccess.branchCode();
+        }
+
+        if (requestedBranchCode == null || requestedBranchCode.isBlank()) {
+            return normalizeBranchCode(fallbackBranchCode);
+        }
+        return normalizeBranchCode(requestedBranchCode);
+    }
+
+    private String normalizeBranchCode(String branchCode) {
+        if (branchCode == null || branchCode.isBlank()) {
+            return DEFAULT_BRANCH;
+        }
+        return branchCode.trim().toUpperCase(Locale.ROOT);
     }
 
     private String normalizeVehicleType(String requestedType) {
@@ -230,9 +312,49 @@ public class ParkingSlotService {
     }
 
     private int recommendationScore(ParkingSlot slot) {
-        String slotName = slot.getSlotName().toUpperCase(Locale.ROOT);
-        int rowScore = slotName.charAt(0) - 'A';
-        int columnScore = Integer.parseInt(slotName.substring(1));
-        return (rowScore * 10) + columnScore;
+        SlotCoordinate coordinate = parseCoordinate(slot.getSlotName());
+        int exitDistance = Math.min(
+                manhattanDistance(coordinate, 0, 0),
+                manhattanDistance(coordinate, 0, 3));
+        int elevatorDistance = Math.min(
+                manhattanDistance(coordinate, 1, 1),
+                manhattanDistance(coordinate, 2, 1));
+
+        return (exitDistance * EXIT_WEIGHT)
+                + (elevatorDistance * ELEVATOR_WEIGHT);
+    }
+
+    private SlotCoordinate parseCoordinate(String slotName) {
+        if (slotName == null || slotName.isBlank()) {
+            return new SlotCoordinate(99, 99);
+        }
+
+        String normalized = slotName.trim().toUpperCase(Locale.ROOT);
+        if (normalized.length() < 2 || !Character.isLetter(normalized.charAt(0))) {
+            return new SlotCoordinate(99, 99);
+        }
+
+        int row = normalized.charAt(0) - 'A';
+        try {
+            int column = Integer.parseInt(normalized.substring(1)) - 1;
+            return new SlotCoordinate(Math.max(row, 0), Math.max(column, 0));
+        } catch (NumberFormatException exception) {
+            return new SlotCoordinate(99, 99);
+        }
+    }
+
+    private int manhattanDistance(SlotCoordinate coordinate, int targetRow, int targetColumn) {
+        return Math.abs(coordinate.row() - targetRow) + Math.abs(coordinate.column() - targetColumn);
+    }
+
+    private record SlotCoordinate(int row, int column) {
+
+    }
+
+    private record BranchAccess(String branchCode, boolean restricted) {
+
+        private static BranchAccess unrestricted() {
+            return new BranchAccess(DEFAULT_BRANCH, false);
+        }
     }
 }

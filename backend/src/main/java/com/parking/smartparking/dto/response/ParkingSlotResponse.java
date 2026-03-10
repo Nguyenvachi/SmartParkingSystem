@@ -24,6 +24,7 @@ public class ParkingSlotResponse {
     private String type;
     private String status;
     private BigDecimal pricePerHour;
+    private String branchCode;
 
     /**
      * Version field cho frontend (để hiển thị trạng thái cập nhật) KHÔNG dùng

@@ -107,6 +107,9 @@ public class Booking {
     @Column(name = "applied_voucher_code", length = 50)
     private String appliedVoucherCode;
 
+    @Column(name = "vehicle_plate", length = 20)
+    private String vehiclePlate;
+
     /**
      * QR Code dạng Base64 PNG (Tech Key #7) Frontend dùng:
      * <img src="data:image/png;base64,{qrCodeBase64}" />

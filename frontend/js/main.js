@@ -44,6 +44,11 @@ document.addEventListener('DOMContentLoaded', function() {
         await topUpWallet();
     });
 
+    document.getElementById('withdrawForm')?.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        await withdrawWallet();
+    });
+
     document.getElementById('ocrForm')?.addEventListener('submit', async function (event) {
         event.preventDefault();
         await simulateOcr();
@@ -92,6 +97,8 @@ async function fetchAllSlots() {
         
         const slots = await response.json();
         console.log('✅ Đã tải', slots.length, 'slots từ server');
+
+        slotsData = {};
         
         // Lưu vào object để tra cứu nhanh
         slots.forEach(slot => {
@@ -157,7 +164,10 @@ function createSlotElement(slotName) {
     `;
     
     // Event click (để đặt chỗ)
-    slotDiv.addEventListener('click', () => handleSlotClick(slotName, slotData));
+    slotDiv.addEventListener('click', () => {
+        const latestSlotData = slotsData[slotName] || createPlaceholderSlot(slotName);
+        handleSlotClick(slotName, latestSlotData);
+    });
     
     return slotDiv;
 }
@@ -695,6 +705,44 @@ async function purchaseMembership() {
     }
 }
 
+async function withdrawWallet() {
+    const user = (typeof getStoredUser === 'function')
+        ? getStoredUser()
+        : JSON.parse(localStorage.getItem('user') || 'null');
+    if (!user || !user.token) return;
+
+    const amountInput = document.getElementById('withdrawAmount');
+    const descriptionInput = document.getElementById('withdrawDescription');
+    const amount = Number(amountInput.value || 0);
+
+    if (!amount || amount <= 0) {
+        showToast('warning', 'Vui lòng nhập số tiền rút hợp lệ.');
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/wallet/withdraw`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${user.token}`
+            },
+            body: JSON.stringify({ amount, description: descriptionInput.value })
+        });
+        const data = await res.json();
+        if (res.status === 401) { handleUnauthorized(); return; }
+        if (!res.ok) throw new Error(data.message || 'Rút tiền thất bại');
+
+        amountInput.value = '';
+        descriptionInput.value = '';
+        showToast('success', `Rút tiền thành công. Số dư mới: ${formatCurrency(data.walletBalance)}`);
+        renderWalletTransactions(data.recentTransactions || []);
+        loadWalletSummary();
+    } catch (err) {
+        showToast('danger', err.message);
+    }
+}
+
 async function loadAvailableVouchers() {
     const panel = document.getElementById('voucherListPanel');
     if (!panel) return;
@@ -828,6 +876,9 @@ function onConnected() {
     
     // Subscribe topic để nhận update
     stompClient.subscribe('/topic/parking-updates', onMessageReceived);
+
+    // Đồng bộ lại toàn bộ map sau khi kết nối hoặc reconnect.
+    fetchAllSlots();
 }
 
 // ============================================
@@ -840,10 +891,15 @@ function onMessageReceived(payload) {
     
     // Cập nhật dữ liệu local
     if (message.slotName) {
-        slotsData[message.slotName] = message;
-        
+        if (message.status === 'DELETED') {
+            delete slotsData[message.slotName];
+        } else {
+            const currentSlot = slotsData[message.slotName] || {};
+            slotsData[message.slotName] = { ...currentSlot, ...message };
+        }
+
         // Cập nhật UI
-        updateSlotUI(message.slotName, message.status);
+        refreshSlotElement(message.slotName);
     }
 }
 
@@ -851,8 +907,9 @@ function onMessageReceived(payload) {
 // 11. CẬP NHẬT UI SLOT (ĐỔI MÀU REAL-TIME)
 // ============================================
 
-function updateSlotUI(slotName, newStatus) {
+function refreshSlotElement(slotName) {
     const slotElement = document.getElementById(`slot-${slotName}`);
+    const slotData = slotsData[slotName] || createPlaceholderSlot(slotName);
     
     if (!slotElement) {
         console.warn('⚠️ Không tìm thấy slot element:', slotName);
@@ -863,15 +920,17 @@ function updateSlotUI(slotName, newStatus) {
     slotElement.classList.remove('slot-available', 'slot-reserved', 'slot-occupied', 'slot-maintenance');
     
     // Thêm class status mới
-    slotElement.classList.add(getStatusClass(newStatus));
+    slotElement.classList.add(getStatusClass(slotData.status));
     
     // Cập nhật text status
     const statusElement = slotElement.querySelector('.slot-status');
     if (statusElement) {
-        statusElement.textContent = getStatusText(newStatus);
+        statusElement.textContent = getStatusText(slotData.status);
     }
+
+    slotElement.dataset.slotStatus = slotData.status;
     
-    console.log(`🎨 Đã cập nhật slot ${slotName} -> ${newStatus}`);
+    console.log(`🎨 Đã cập nhật slot ${slotName} -> ${slotData.status}`);
 }
 
 // ============================================
@@ -880,7 +939,7 @@ function updateSlotUI(slotName, newStatus) {
 
 function onError(error) {
     console.error('❌ Lỗi WebSocket:', error);
-    showError('Mất kết nối real-time. Đang thử kết nối lại...');
+    showToast('warning', 'Mất kết nối real-time. Hệ thống sẽ tự kết nối lại.');
     
     // Thử kết nối lại sau 5 giây
     setTimeout(connectWebSocket, 5000);

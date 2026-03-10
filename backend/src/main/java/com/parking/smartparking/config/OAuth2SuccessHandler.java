@@ -95,13 +95,14 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                 user.getId());
 
         String redirectUrl = String.format(
-                "%s%s?userId=%d&email=%s&fullName=%s&role=%s&avatarUrl=%s&token=%s",
+                "%s%s?userId=%d&email=%s&fullName=%s&role=%s&branchCode=%s&avatarUrl=%s&token=%s",
                 frontendBaseUrl,
                 frontendDashboardPath,
                 user.getId(),
                 URLEncoder.encode(email, StandardCharsets.UTF_8),
                 URLEncoder.encode(user.getFullName() != null ? user.getFullName() : "", StandardCharsets.UTF_8),
                 user.getRole().name(),
+                URLEncoder.encode(user.getBranchCode() != null ? user.getBranchCode() : "", StandardCharsets.UTF_8),
                 URLEncoder.encode(user.getAvatarUrl() != null ? user.getAvatarUrl() : "", StandardCharsets.UTF_8),
                 URLEncoder.encode(jwtToken, StandardCharsets.UTF_8));
 

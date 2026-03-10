@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.parking.smartparking.dto.request.MembershipPurchaseRequest;
 import com.parking.smartparking.dto.request.WalletTopUpRequest;
+import com.parking.smartparking.dto.request.WalletWithdrawRequest;
 import com.parking.smartparking.dto.response.WalletSummaryResponse;
 import com.parking.smartparking.dto.response.WalletTransactionResponse;
 import com.parking.smartparking.entity.User;
@@ -21,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class WalletService {
 
     private final UserRepository userRepository;
@@ -28,6 +30,9 @@ public class WalletService {
 
     @Value("${app.wallet.minimum-topup:10000}")
     private BigDecimal minimumTopUp;
+
+    @Value("${app.wallet.minimum-withdraw:1000}")
+    private BigDecimal minimumWithdraw;
 
     @Value("${app.membership.monthly-fee:300000}")
     private BigDecimal monthlyMembershipFee;
@@ -47,7 +52,7 @@ public class WalletService {
 
     @Transactional
     public WalletSummaryResponse topUp(String email, WalletTopUpRequest request) {
-        User user = getUserByEmail(email);
+        User user = getUserByEmailForUpdate(email);
         BigDecimal amount = request.getAmount();
 
         if (amount.compareTo(minimumTopUp) < 0) {
@@ -71,8 +76,35 @@ public class WalletService {
     }
 
     @Transactional
+    public WalletSummaryResponse withdraw(String email, WalletWithdrawRequest request) {
+        User user = getUserByEmailForUpdate(email);
+        BigDecimal amount = request.getAmount();
+
+        if (amount.compareTo(minimumWithdraw) < 0) {
+            throw new RuntimeException("Số tiền rút tối thiểu là " + minimumWithdraw.toPlainString() + " VND.");
+        }
+
+        ensureSufficientBalance(user, amount, "Số dư ví không đủ để rút tiền.");
+
+        BigDecimal newBalance = user.getWalletBalance().subtract(amount);
+        user.setWalletBalance(newBalance);
+        userRepository.save(user);
+
+        createTransaction(
+                user,
+                WalletTransaction.TransactionType.WITHDRAWAL,
+                amount.negate(),
+                newBalance,
+                request.getDescription() != null && !request.getDescription().isBlank()
+                ? request.getDescription()
+                : "Rút tiền từ ví Smart Parking");
+
+        return toWalletSummary(user);
+    }
+
+    @Transactional
     public WalletSummaryResponse purchaseMembership(String email, MembershipPurchaseRequest request) {
-        User user = getUserByEmail(email);
+        User user = getUserByEmailForUpdate(email);
         user.setAutoRenewMembership(Boolean.TRUE.equals(request.getAutoRenewMembership()));
 
         renewMembership(user, WalletTransaction.TransactionType.MEMBERSHIP_PURCHASE, "Mua/gia hạn vé tháng");
@@ -85,36 +117,44 @@ public class WalletService {
             return;
         }
 
-        ensureSufficientBalance(user, amount, "Số dư ví không đủ để check-out. Vui lòng nạp thêm tiền.");
+        User lockedUser = getUserByIdForUpdate(user.getId());
 
-        BigDecimal newBalance = user.getWalletBalance().subtract(amount);
-        user.setWalletBalance(newBalance);
-        userRepository.save(user);
+        ensureSufficientBalance(lockedUser, amount, "Số dư ví không đủ để check-out. Vui lòng nạp thêm tiền.");
+
+        BigDecimal newBalance = lockedUser.getWalletBalance().subtract(amount);
+        lockedUser.setWalletBalance(newBalance);
+        userRepository.save(lockedUser);
 
         createTransaction(
-                user,
+                lockedUser,
                 WalletTransaction.TransactionType.PARKING_PAYMENT,
                 amount.negate(),
                 newBalance,
                 description);
+
+        syncWalletState(user, lockedUser);
     }
 
     @Transactional
     public boolean processAutoRenewMembership(User user) {
-        if (user.getMembershipPlan() != User.MembershipPlan.MONTHLY || !Boolean.TRUE.equals(user.getAutoRenewMembership())) {
+        User lockedUser = getUserByIdForUpdate(user.getId());
+
+        if (lockedUser.getMembershipPlan() != User.MembershipPlan.MONTHLY
+                || !Boolean.TRUE.equals(lockedUser.getAutoRenewMembership())) {
             return false;
         }
 
         LocalDateTime now = LocalDateTime.now();
-        if (user.getMembershipExpiry() != null && user.getMembershipExpiry().isAfter(now)) {
+        if (lockedUser.getMembershipExpiry() != null && lockedUser.getMembershipExpiry().isAfter(now)) {
             return false;
         }
 
-        if (user.getWalletBalance().compareTo(monthlyMembershipFee) < 0) {
+        if (lockedUser.getWalletBalance().compareTo(monthlyMembershipFee) < 0) {
             return false;
         }
 
-        renewMembership(user, WalletTransaction.TransactionType.MEMBERSHIP_RENEWAL, "Tự động gia hạn vé tháng");
+        renewMembership(lockedUser, WalletTransaction.TransactionType.MEMBERSHIP_RENEWAL, "Tự động gia hạn vé tháng");
+        syncWalletState(user, lockedUser);
         return true;
     }
 
@@ -199,9 +239,34 @@ public class WalletService {
                 .build());
     }
 
+    private void syncWalletState(User target, User source) {
+        if (target == null || source == null) {
+            return;
+        }
+
+        target.setWalletBalance(source.getWalletBalance());
+        target.setMembershipPlan(source.getMembershipPlan());
+        target.setMembershipExpiry(source.getMembershipExpiry());
+        target.setAutoRenewMembership(source.getAutoRenewMembership());
+    }
+
     private User getUserByEmail(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy user: " + email));
+
+        return normalizePhase4State(user);
+    }
+
+    private User getUserByEmailForUpdate(String email) {
+        User user = userRepository.findByEmailForUpdate(email)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user: " + email));
+
+        return normalizePhase4State(user);
+    }
+
+    private User getUserByIdForUpdate(Long userId) {
+        User user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user #" + userId));
 
         return normalizePhase4State(user);
     }

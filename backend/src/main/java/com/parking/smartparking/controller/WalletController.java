@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.parking.smartparking.dto.request.MembershipPurchaseRequest;
 import com.parking.smartparking.dto.request.WalletTopUpRequest;
+import com.parking.smartparking.dto.request.WalletWithdrawRequest;
 import com.parking.smartparking.dto.response.WalletSummaryResponse;
 import com.parking.smartparking.dto.response.WalletTransactionResponse;
 import com.parking.smartparking.service.WalletService;
@@ -44,6 +45,14 @@ public class WalletController {
             Authentication authentication) {
         String email = authentication.getName();
         return ResponseEntity.ok(walletService.topUp(email, request));
+    }
+
+    @PostMapping("/withdraw")
+    public ResponseEntity<WalletSummaryResponse> withdraw(
+            @Valid @RequestBody WalletWithdrawRequest request,
+            Authentication authentication) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(walletService.withdraw(email, request));
     }
 
     @PostMapping("/membership")

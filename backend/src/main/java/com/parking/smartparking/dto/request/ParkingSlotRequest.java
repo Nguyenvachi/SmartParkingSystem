@@ -32,4 +32,7 @@ public class ParkingSlotRequest {
 
     @DecimalMin(value = "0.0", message = "Giá phải lớn hơn hoặc bằng 0")
     private BigDecimal pricePerHour = BigDecimal.valueOf(5000.00);
+
+    @Pattern(regexp = "^$|^[A-Z0-9_-]{2,20}$", message = "Mã chi nhánh chỉ gồm chữ in hoa, số, _ hoặc -")
+    private String branchCode;
 }
