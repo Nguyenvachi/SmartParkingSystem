@@ -101,6 +101,12 @@ public class Booking {
     @Column(name = "total_amount", precision = 10, scale = 2)
     private BigDecimal totalAmount;
 
+    @Column(name = "discount_amount", precision = 10, scale = 2)
+    private BigDecimal discountAmount;
+
+    @Column(name = "applied_voucher_code", length = 50)
+    private String appliedVoucherCode;
+
     /**
      * QR Code dạng Base64 PNG (Tech Key #7) Frontend dùng:
      * <img src="data:image/png;base64,{qrCodeBase64}" />

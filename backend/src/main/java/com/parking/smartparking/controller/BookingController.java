@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.parking.smartparking.dto.request.BookingRequest;
+import com.parking.smartparking.dto.request.CheckoutRequest;
 import com.parking.smartparking.dto.response.BookingResponse;
 import com.parking.smartparking.service.BookingService;
 
@@ -114,9 +115,10 @@ public class BookingController {
     @PostMapping("/{id}/checkout")
     public ResponseEntity<BookingResponse> checkOut(
             @PathVariable Long id,
+            @RequestBody(required = false) CheckoutRequest request,
             Authentication authentication) {
         String email = authentication.getName();
-        BookingResponse response = bookingService.checkOut(id, email);
+        BookingResponse response = bookingService.checkOut(id, email, request);
         return ResponseEntity.ok(response);
     }
 

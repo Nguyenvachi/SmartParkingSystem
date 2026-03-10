@@ -60,6 +60,7 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/audit-logs/**").hasAuthority("ROLE_ADMIN")
                 // [FIX 4] Phân quyền theo HTTP Method cho Slot API
                 .requestMatchers(HttpMethod.GET, "/api/slots/**").permitAll() // Xem: Tự do
                 .requestMatchers(HttpMethod.POST, "/api/slots/**").hasAuthority("ROLE_ADMIN") // Tạo: Admin

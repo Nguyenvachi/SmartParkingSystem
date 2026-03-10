@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.parking.smartparking.controller.WebSocketController;
 import com.parking.smartparking.dto.request.BookingRequest;
+import com.parking.smartparking.dto.request.CheckoutRequest;
 import com.parking.smartparking.dto.response.BookingResponse;
 import com.parking.smartparking.dto.response.ParkingSlotResponse;
 import com.parking.smartparking.entity.Booking;
@@ -53,6 +54,7 @@ public class BookingService {
     private final WebSocketController webSocketController;
         private final PricingService pricingService;
         private final WalletService walletService;
+        private final VoucherService voucherService;
 
     /**
      * ===== CORE LOGIC: TẠO BOOKING VỚI OPTIMISTIC LOCKING =====
@@ -196,6 +198,11 @@ public class BookingService {
      */
     @Transactional
     public BookingResponse checkOut(Long bookingId, String userEmail) {
+                return checkOut(bookingId, userEmail, null);
+        }
+
+        @Transactional
+        public BookingResponse checkOut(Long bookingId, String userEmail, CheckoutRequest request) {
         Booking booking = bookingRepository.findByIdAndUser_Email(bookingId, userEmail)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy booking #" + bookingId));
 
@@ -212,17 +219,28 @@ public class BookingService {
         LocalDateTime checkOutTime = LocalDateTime.now();
         PricingService.PricingResult pricingResult = pricingService.calculateCheckoutAmount(booking, user, checkOutTime);
 
-        BigDecimal totalAmount = pricingResult.totalAmount();
+        BigDecimal subtotalAmount = pricingResult.totalAmount();
+        VoucherService.AppliedVoucher appliedVoucher = voucherService.applyVoucherToAmount(
+                request != null ? request.getVoucherCode() : null,
+                subtotalAmount);
+
+        BigDecimal totalAmount = subtotalAmount.subtract(appliedVoucher.discountAmount());
         if (totalAmount.signum() > 0) {
             walletService.chargeForParking(
                     user,
                     totalAmount,
-                    String.format("Thanh toán booking #%d - slot %s", booking.getId(), booking.getParkingSlot().getSlotName()));
+                    String.format(
+                            "Thanh toán booking #%d - slot %s%s",
+                            booking.getId(),
+                            booking.getParkingSlot().getSlotName(),
+                            appliedVoucher.code() != null ? " | voucher " + appliedVoucher.code() : ""));
         }
 
         booking.setStatus(Booking.BookingStatus.COMPLETED);
         booking.setCheckOutTime(checkOutTime);
         booking.setTotalAmount(totalAmount);
+        booking.setDiscountAmount(appliedVoucher.discountAmount());
+        booking.setAppliedVoucherCode(appliedVoucher.code());
 
         ParkingSlot slot = booking.getParkingSlot();
         slot.setStatus("AVAILABLE");
@@ -231,9 +249,14 @@ public class BookingService {
 
         webSocketController.sendSlotUpdate(toSlotResponse(slot));
 
+        String voucherMessage = appliedVoucher.code() != null
+                ? String.format(" Đã áp dụng voucher %s, giảm %s VND.",
+                        appliedVoucher.code(), appliedVoucher.discountAmount().toPlainString())
+                : "";
+
         String checkoutMessage = totalAmount.signum() > 0
-                ? String.format("Check-out thành công. Đã trừ %s VND từ ví. %s",
-                        totalAmount.toPlainString(), pricingResult.note())
+                ? String.format("Check-out thành công. Đã trừ %s VND từ ví.%s %s",
+                        totalAmount.toPlainString(), voucherMessage, pricingResult.note())
                 : "Check-out thành công. " + pricingResult.note();
 
         log.info("🏁 Check-out: Booking #{} → Slot [{}] AVAILABLE | total={}",
@@ -296,6 +319,8 @@ public class BookingService {
                 .checkInTime(booking.getCheckInTime())
                 .checkOutTime(booking.getCheckOutTime())
                 .totalAmount(booking.getTotalAmount())
+                                .discountAmount(booking.getDiscountAmount())
+                                .appliedVoucherCode(booking.getAppliedVoucherCode())
                 .qrCodeBase64(booking.getQrCodeBase64())
                 .message(message)
                 .build();
