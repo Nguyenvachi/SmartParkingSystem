@@ -59,6 +59,7 @@ public class SecurityConfig {
                 // Cách cũ: cors -> cors.configure(http) gọi configure() 2 lần -> bút CorsFilter 2 lần
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // [FIX 4] Phân quyền theo HTTP Method cho Slot API
                 .requestMatchers(HttpMethod.GET, "/api/slots/**").permitAll() // Xem: Tự do
                 .requestMatchers(HttpMethod.POST, "/api/slots/**").hasAuthority("ROLE_ADMIN") // Tạo: Admin
@@ -66,17 +67,20 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.DELETE, "/api/slots/**").hasAuthority("ROLE_ADMIN") // Xóa: Admin
                 // Cho phép truy cập tự do
                 .requestMatchers(
-                        "/api/auth/**", // API Authentication
-                        // "/api/slots/**", // [ĐÃ TÁCH - Phân quyền theo HTTP Method phía trên - FIX 4]
-                        "/ws/**", // WebSocket endpoint (SockJS)
-                        "/login/oauth2/**", "/oauth2/**", // OAuth2 endpoints (QUAN TRỌNG)
-                        "/", // Trang chủ
+                        "/api/auth/**",
+                        "/ws/**",
+                        "/login/oauth2/**",
+                        "/oauth2/**",
+                        "/error",
+                        "/",
                         "/index.html",
+                        "/login",
                         "/login.html",
+                        "/dashboard",
                         "/dashboard.html",
-                        "/css/**", // File CSS
-                        "/js/**", // File JavaScript
-                        "/assets/**", // File ảnh
+                        "/css/**",
+                        "/js/**",
+                        "/assets/**",
                         "/images/**"
                 ).permitAll()
                 // Tất cả request khác bắt buộc đăng nhập

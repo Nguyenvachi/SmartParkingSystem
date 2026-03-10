@@ -1,16 +1,24 @@
 package com.parking.smartparking.controller;
 
-import com.parking.smartparking.dto.request.BookingRequest;
-import com.parking.smartparking.dto.response.BookingResponse;
-import com.parking.smartparking.service.BookingService;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
+import com.parking.smartparking.dto.request.BookingRequest;
+import com.parking.smartparking.dto.response.BookingResponse;
+import com.parking.smartparking.service.BookingService;
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 
 /**
  * BookingController - REST API cho chức năng đặt chỗ
@@ -97,6 +105,18 @@ public class BookingController {
             Authentication authentication) {
         String email = authentication.getName();
         BookingResponse response = bookingService.checkIn(id, email);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * API Check-out (Ra bãi xe + thanh toán ví)
+     */
+    @PostMapping("/{id}/checkout")
+    public ResponseEntity<BookingResponse> checkOut(
+            @PathVariable Long id,
+            Authentication authentication) {
+        String email = authentication.getName();
+        BookingResponse response = bookingService.checkOut(id, email);
         return ResponseEntity.ok(response);
     }
 

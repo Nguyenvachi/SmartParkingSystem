@@ -205,6 +205,13 @@ const BookingAPI = {
     },
 
     /**
+     * Check-out ra bãi và thanh toán bằng ví
+     */
+    checkOut: async (bookingId) => {
+        return await apiRequest(`/bookings/${bookingId}/checkout`, { method: 'POST' });
+    },
+
+    /**
      * Hủy booking — DELETE /api/bookings/{id}
      * Chỉ được hủy khi status = PENDING
      * @param {number} bookingId
@@ -212,4 +219,35 @@ const BookingAPI = {
     cancel: async (bookingId) => {
         return await apiRequest(`/bookings/${bookingId}`, { method: 'DELETE' });
     }
+};
+
+const WalletAPI = {
+    getSummary: async () => {
+        return await apiRequest('/wallet', { method: 'GET' });
+    },
+
+    getTransactions: async () => {
+        return await apiRequest('/wallet/transactions', { method: 'GET' });
+    },
+
+    topUp: async (amount, description = '') => {
+        return await apiRequest('/wallet/top-up', {
+            method: 'POST',
+            body: JSON.stringify({ amount, description })
+        });
+    },
+
+    purchaseMembership: async (autoRenewMembership = false) => {
+        return await apiRequest('/wallet/membership', {
+            method: 'POST',
+            body: JSON.stringify({ plan: 'MONTHLY', autoRenewMembership })
+        });
+    }
+};
+
+SlotAPI.getRecommendation = async (vehicleType = null) => {
+    const queryParam = vehicleType ? `?vehicleType=${vehicleType}` : '';
+    return await apiRequest(`/slots/recommendation${queryParam}`, {
+        method: 'GET'
+    });
 };

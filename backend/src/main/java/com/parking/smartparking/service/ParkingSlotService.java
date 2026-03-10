@@ -1,6 +1,8 @@
 package com.parking.smartparking.service;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -8,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.parking.smartparking.controller.WebSocketController;
 import com.parking.smartparking.dto.request.ParkingSlotRequest;
+import com.parking.smartparking.dto.response.ParkingRecommendationResponse;
 import com.parking.smartparking.dto.response.ParkingSlotResponse;
 import com.parking.smartparking.entity.ParkingSlot;
 import com.parking.smartparking.repository.ParkingSlotRepository;
@@ -53,6 +56,47 @@ public class ParkingSlotService {
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
+
+        public ParkingRecommendationResponse recommendSlot(String requestedType) {
+        String normalizedType = normalizeVehicleType(requestedType);
+
+        List<ParkingSlot> availableSlots = parkingSlotRepository.findByStatusOrderBySlotNameAsc("AVAILABLE");
+        if (availableSlots.isEmpty()) {
+            throw new RuntimeException("Hiện tại không còn slot AVAILABLE để gợi ý.");
+        }
+
+        List<ParkingSlot> typeMatchedSlots = normalizedType == null
+            ? availableSlots
+            : availableSlots.stream()
+                .filter(slot -> normalizedType.equalsIgnoreCase(slot.getType()))
+                .toList();
+
+        List<ParkingSlot> candidateSlots = typeMatchedSlots.isEmpty() ? availableSlots : typeMatchedSlots;
+
+        List<ParkingSlotResponse> rankedSlots = candidateSlots.stream()
+            .sorted(Comparator
+                .comparingInt(this::recommendationScore)
+                .thenComparing(ParkingSlot::getSlotName))
+            .map(this::convertToResponse)
+            .toList();
+
+        ParkingSlotResponse recommendedSlot = rankedSlots.get(0);
+        List<ParkingSlotResponse> alternativeSlots = rankedSlots.stream()
+            .skip(1)
+            .limit(3)
+            .toList();
+
+        String explanation = typeMatchedSlots.isEmpty() && normalizedType != null
+            ? "Không còn slot cùng loại xe, hệ thống đề xuất slot trống gần cổng nhất còn lại."
+            : "Ưu tiên slot trống gần cổng ra/thang máy nhất theo thứ tự bản đồ và đúng loại xe nếu có.";
+
+        return ParkingRecommendationResponse.builder()
+            .requestedType(normalizedType != null ? normalizedType : "ANY")
+            .recommendedSlot(recommendedSlot)
+            .alternativeSlots(alternativeSlots)
+            .explanation(explanation)
+            .build();
+        }
 
     /**
      * Lấy thông tin 1 slot theo ID
@@ -171,5 +215,24 @@ public class ParkingSlotService {
                 .pricePerHour(slot.getPricePerHour())
                 .version(slot.getVersion())
                 .build();
+    }
+
+    private String normalizeVehicleType(String requestedType) {
+        if (requestedType == null || requestedType.isBlank()) {
+            return null;
+        }
+
+        String normalized = requestedType.trim().toUpperCase(Locale.ROOT);
+        if (!List.of("SEDAN", "SUV").contains(normalized)) {
+            throw new RuntimeException("Loại xe gợi ý chỉ hỗ trợ SEDAN hoặc SUV.");
+        }
+        return normalized;
+    }
+
+    private int recommendationScore(ParkingSlot slot) {
+        String slotName = slot.getSlotName().toUpperCase(Locale.ROOT);
+        int rowScore = slotName.charAt(0) - 'A';
+        int columnScore = Integer.parseInt(slotName.substring(1));
+        return (rowScore * 10) + columnScore;
     }
 }

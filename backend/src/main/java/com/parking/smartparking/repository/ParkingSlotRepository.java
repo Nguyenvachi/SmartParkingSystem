@@ -22,6 +22,8 @@ public interface ParkingSlotRepository extends JpaRepository<ParkingSlot, Long> 
      */
     List<ParkingSlot> findByStatus(String status);
 
+    List<ParkingSlot> findByStatusOrderBySlotNameAsc(String status);
+
     /**
      * Tìm slot theo tên (Ví dụ: A01)
      *

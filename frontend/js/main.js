@@ -33,6 +33,15 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Bước 2: Kết nối WebSocket
     connectWebSocket();
+
+    // Phase 4
+    loadRecommendation();
+    loadWalletSummary();
+
+    document.getElementById('topUpForm')?.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        await topUpWallet();
+    });
 });
 
 // ============================================
@@ -40,34 +49,24 @@ document.addEventListener('DOMContentLoaded', function() {
 // Decode JWT payload (không cần verify signature)
 // ============================================
 function checkTokenAndRedirect() {
-    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    const user = (typeof getStoredUser === 'function')
+        ? getStoredUser()
+        : JSON.parse(localStorage.getItem('user') || 'null');
     if (!user || !user.token) {
-        // Không có token -> auth.js sẽ redirect về login
-        return false;
+        const loginUrl = (typeof FRONTEND_LOGIN_URL !== 'undefined' && FRONTEND_LOGIN_URL)
+            ? FRONTEND_LOGIN_URL : '/login';
+        localStorage.removeItem('user');
+        window.location.href = loginUrl + '?reason=expired';
+        return true;
     }
 
-    try {
-        // JWT có dạng: header.payload.signature
-        const payloadBase64 = user.token.split('.')[1];
-        // Base64URL -> Base64 -> JSON
-        const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
-        const expMs = payload.exp * 1000; // exp là giây, cần đổi sang ms
-
-        if (Date.now() >= expMs) {
-            console.warn('⚠️ Token đã hết hạn. Đang chuyển về trang đăng nhập...');
-            localStorage.removeItem('user');
-            const loginUrl = (typeof FRONTEND_LOGIN_URL !== 'undefined' && FRONTEND_LOGIN_URL)
-                ? FRONTEND_LOGIN_URL : '/login';
-            window.location.href = loginUrl + '?reason=expired';
-            return true;
-        }
-    } catch (e) {
-        // Token không đúng định dạng JWT -> coi như không hợp lệ
-        console.warn('⚠️ Token không hợp lệ, xóa và chuyển về login', e);
+    const tokenValid = (typeof hasValidToken === 'function') ? hasValidToken(user) : true;
+    if (!tokenValid) {
+        console.warn('⚠️ Token không hợp lệ hoặc đã hết hạn. Đang chuyển về trang đăng nhập...');
         localStorage.removeItem('user');
         const loginUrl = (typeof FRONTEND_LOGIN_URL !== 'undefined' && FRONTEND_LOGIN_URL)
             ? FRONTEND_LOGIN_URL : '/login';
-        window.location.href = loginUrl + '?reason=invalid';
+        window.location.href = loginUrl + '?reason=expired';
         return true;
     }
     return false;
@@ -135,7 +134,7 @@ function renderParkingGrid() {
 // ============================================
 
 function createSlotElement(slotName) {
-    const slotData = slotsData[slotName] || { status: 'AVAILABLE' };
+    const slotData = slotsData[slotName] || createPlaceholderSlot(slotName);
     
     const slotDiv = document.createElement('div');
     slotDiv.className = 'parking-slot';
@@ -166,9 +165,10 @@ function getStatusClass(status) {
         'AVAILABLE': 'slot-available',
         'RESERVED': 'slot-reserved',
         'OCCUPIED': 'slot-occupied',
-        'MAINTENANCE': 'slot-maintenance'
+        'MAINTENANCE': 'slot-maintenance',
+        'UNCONFIGURED': 'slot-maintenance'
     };
-    return statusMap[status] || 'slot-available';
+    return statusMap[status] || 'slot-maintenance';
 }
 
 function getStatusText(status) {
@@ -176,9 +176,20 @@ function getStatusText(status) {
         'AVAILABLE': 'Trống',
         'RESERVED': 'Đã đặt',
         'OCCUPIED': 'Đang đỗ',
-        'MAINTENANCE': 'Bảo trì'
+        'MAINTENANCE': 'Bảo trì',
+        'UNCONFIGURED': 'Chưa tạo'
     };
     return textMap[status] || 'N/A';
+}
+
+function createPlaceholderSlot(slotName) {
+    return {
+        id: null,
+        slotName,
+        type: 'N/A',
+        status: 'UNCONFIGURED',
+        pricePerHour: null
+    };
 }
 
 // ============================================
@@ -186,8 +197,13 @@ function getStatusText(status) {
 // ============================================
 
 function handleSlotClick(slotName, slotData) {
+    if (!slotData || !slotData.id) {
+        showToast('warning', `Slot ${slotName} chưa được tạo trong hệ thống.`);
+        return;
+    }
+
     if (slotData.status !== 'AVAILABLE') {
-        alert(`Slot ${slotName} không khả dụng (${getStatusText(slotData.status)})`);
+        showToast('warning', `Slot ${slotName} không khả dụng (${getStatusText(slotData.status)})`);
         return;
     }
 
@@ -205,11 +221,18 @@ let selectedSlotData = null;
  * Hiện modal xác nhận đặt chỗ
  */
 function showBookingModal(slotName, slotData) {
+    if (!slotData || !slotData.id) {
+        showToast('warning', `Slot ${slotName} chưa được tạo trong hệ thống.`);
+        return;
+    }
+
     selectedSlotData = slotData;
     document.getElementById('modalSlotName').textContent = slotName;
-    document.getElementById('modalSlotType').textContent = slotData.type || 'SEDAN';
+    document.getElementById('modalSlotType').textContent = slotData.type || 'N/A';
     document.getElementById('modalSlotPrice').textContent =
-        (slotData.pricePerHour || 5000).toLocaleString('vi-VN') + ' VNĐ/giờ';
+        slotData.pricePerHour
+            ? slotData.pricePerHour.toLocaleString('vi-VN') + ' VNĐ/giờ'
+            : 'Chưa cấu hình';
 
     const modal = new bootstrap.Modal(document.getElementById('bookingModal'));
     modal.show();
@@ -222,10 +245,22 @@ function showBookingModal(slotName, slotData) {
 async function confirmBooking() {
     if (!selectedSlotData) return;
 
-    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    if (!selectedSlotData.id) {
+        showToast('warning', 'Slot này chưa được tạo trong hệ thống, chưa thể đặt chỗ.');
+        return;
+    }
+
+    const user = (typeof getStoredUser === 'function')
+        ? getStoredUser()
+        : JSON.parse(localStorage.getItem('user') || 'null');
     if (!user || !user.token) {
         alert('Bạn cần đăng nhập để đặt chỗ!');
-        window.location.href = '/login';
+        window.location.href = FRONTEND_LOGIN_URL;
+        return;
+    }
+
+    if (typeof hasValidToken === 'function' && !hasValidToken(user)) {
+        handleUnauthorized();
         return;
     }
 
@@ -303,7 +338,9 @@ function showQRModal(bookingData) {
  * Check-in vào bãi xe — POST /api/bookings/{id}/checkin
  */
 async function doCheckIn(bookingId) {
-    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    const user = (typeof getStoredUser === 'function')
+        ? getStoredUser()
+        : JSON.parse(localStorage.getItem('user') || 'null');
     if (!user || !user.token) return;
 
     const btn = document.getElementById('btnCheckIn');
@@ -322,6 +359,7 @@ async function doCheckIn(bookingId) {
         bootstrap.Modal.getInstance(document.getElementById('qrModal')).hide();
         showToast('success', `✅ Check-in thành công! Slot ${data.slotName} đang đỗ.`);
         loadBookingHistory();
+        loadWalletSummary();
 
     } catch (err) {
         showToast('danger', err.message);
@@ -335,7 +373,9 @@ async function doCheckIn(bookingId) {
  */
 async function cancelBooking(bookingId) {
     if (!confirm('Bạn có chắc muốn hủy booking này?')) return;
-    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    const user = (typeof getStoredUser === 'function')
+        ? getStoredUser()
+        : JSON.parse(localStorage.getItem('user') || 'null');
     if (!user || !user.token) return;
 
     try {
@@ -349,7 +389,33 @@ async function cancelBooking(bookingId) {
 
         showToast('warning', `Đã hủy booking #${bookingId}. Slot được trả về trạng thái trống.`);
         loadBookingHistory();
+        loadWalletSummary();
 
+    } catch (err) {
+        showToast('danger', err.message);
+    }
+}
+
+async function doCheckOut(bookingId) {
+    if (!confirm('Xác nhận check-out và thanh toán bằng ví?')) return;
+
+    const user = (typeof getStoredUser === 'function')
+        ? getStoredUser()
+        : JSON.parse(localStorage.getItem('user') || 'null');
+    if (!user || !user.token) return;
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/checkout`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${user.token}` }
+        });
+        const data = await res.json();
+        if (res.status === 401) { handleUnauthorized(); return; }
+        if (!res.ok) throw new Error(data.message || 'Check-out thất bại');
+
+        showToast('success', data.message || `Check-out thành công cho booking #${bookingId}`);
+        loadBookingHistory();
+        loadWalletSummary();
     } catch (err) {
         showToast('danger', err.message);
     }
@@ -359,7 +425,9 @@ async function cancelBooking(bookingId) {
  * Load lịch sử booking của user — GET /api/bookings
  */
 async function loadBookingHistory() {
-    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    const user = (typeof getStoredUser === 'function')
+        ? getStoredUser()
+        : JSON.parse(localStorage.getItem('user') || 'null');
     if (!user || !user.token) return;
 
     const container = document.getElementById('bookingHistoryList');
@@ -390,6 +458,8 @@ async function loadBookingHistory() {
                         <small>Slot: <strong>${b.slotName}</strong></small><br>
                         <small>${new Date(b.bookingTime).toLocaleString('vi-VN')}</small>
                         ${b.status === 'PENDING' ? `<br><small class="text-danger">Hết hạn: ${new Date(b.expiryTime).toLocaleTimeString('vi-VN')}</small>` : ''}
+                        ${b.status === 'CHECKED_IN' ? `<br><small class="text-primary">Đã vào bãi: ${new Date(b.checkInTime).toLocaleString('vi-VN')}</small>` : ''}
+                        ${b.status === 'COMPLETED' ? `<br><small class="text-success">Tổng phí: ${formatCurrency(b.totalAmount || 0)}</small>` : ''}
                     </div>
                     <div class="d-flex flex-column gap-1">
                         ${b.status === 'PENDING' ? `
@@ -398,6 +468,11 @@ async function loadBookingHistory() {
                             </button>
                             <button class="btn btn-xs btn-outline-danger py-0 px-1" onclick="cancelBooking(${b.bookingId})" title="Hủy">
                                 <i class="bi bi-x-lg"></i>
+                            </button>
+                        ` : ''}
+                        ${b.status === 'CHECKED_IN' ? `
+                            <button class="btn btn-xs btn-primary py-0 px-1" onclick="doCheckOut(${b.bookingId})" title="Check-out">
+                                <i class="bi bi-box-arrow-right"></i>
                             </button>
                         ` : ''}
                     </div>
@@ -418,6 +493,189 @@ function getBookingCardClass(status) {
 function getStatusBadge(status) {
     return { PENDING: 'bg-warning text-dark', CHECKED_IN: 'bg-primary',
              COMPLETED: 'bg-success', CANCELLED: 'bg-secondary' }[status] || 'bg-secondary';
+}
+
+function formatCurrency(value) {
+    return Number(value || 0).toLocaleString('vi-VN') + ' VND';
+}
+
+function switchSidebarTab(tabId) {
+    const trigger = document.querySelector(`[data-bs-target="#${tabId}"]`);
+    if (!trigger) return;
+    bootstrap.Tab.getOrCreateInstance(trigger).show();
+
+    if (tabId === 'tabHistory') {
+        loadBookingHistory();
+    }
+    if (tabId === 'tabWallet') {
+        loadWalletSummary();
+    }
+}
+
+async function loadRecommendation(vehicleType = null) {
+    const panel = document.getElementById('recommendationPanel');
+    if (!panel) return;
+
+    panel.innerHTML = '<div class="text-muted">Đang tính toán gợi ý...</div>';
+
+    try {
+        const query = vehicleType ? `?vehicleType=${encodeURIComponent(vehicleType)}` : '';
+        const res = await fetch(`${API_BASE_URL}/slots/recommendation${query}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Không lấy được gợi ý chỗ đỗ');
+
+        const recommended = data.recommendedSlot;
+        const alternatives = data.alternativeSlots || [];
+
+        panel.innerHTML = `
+            <div class="border rounded p-2 bg-light-subtle">
+                <div class="fw-semibold text-primary mb-1">Đề xuất chính: ${recommended.slotName}</div>
+                <div class="small mb-2">Loại xe: ${recommended.type} • Giá: ${formatCurrency(recommended.pricePerHour)}</div>
+                <div class="small text-muted mb-2">${data.explanation || ''}</div>
+                <button class="btn btn-primary btn-sm w-100 mb-2" onclick="bookRecommendedSlot('${recommended.slotName}')">
+                    Đặt slot ${recommended.slotName}
+                </button>
+                <div class="small text-muted">Phương án khác: ${alternatives.length > 0 ? alternatives.map(slot => slot.slotName).join(', ') : 'Không có'}</div>
+            </div>
+        `;
+    } catch (err) {
+        panel.innerHTML = `<div class="text-danger">${err.message}</div>`;
+    }
+}
+
+function bookRecommendedSlot(slotName) {
+    const slotData = slotsData[slotName];
+    if (!slotData) {
+        showToast('warning', `Slot ${slotName} hiện chưa được tải từ server.`);
+        return;
+    }
+    handleSlotClick(slotName, slotData);
+}
+
+async function loadWalletSummary() {
+    const user = (typeof getStoredUser === 'function')
+        ? getStoredUser()
+        : JSON.parse(localStorage.getItem('user') || 'null');
+    if (!user || !user.token) return;
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/wallet`, {
+            headers: { 'Authorization': `Bearer ${user.token}` }
+        });
+        const data = await res.json();
+        if (res.status === 401) { handleUnauthorized(); return; }
+        if (!res.ok) throw new Error(data.message || 'Không tải được ví');
+
+        document.getElementById('walletBalanceValue').textContent = formatCurrency(data.walletBalance);
+        document.getElementById('membershipFeeValue').textContent = formatCurrency(data.monthlyMembershipFee);
+        document.getElementById('autoRenewMembership').checked = Boolean(data.autoRenewMembership);
+
+        const membershipText = data.membershipPlan === 'MONTHLY'
+            ? `Vé tháng còn hạn đến ${new Date(data.membershipExpiry).toLocaleString('vi-VN')}${data.autoRenewMembership ? ' • Tự động gia hạn đang bật' : ''}`
+            : 'Chưa có vé tháng. Mua vé tháng để được miễn phí khi check-out trong thời gian hiệu lực.';
+        document.getElementById('membershipSummaryText').textContent = membershipText;
+
+        renderWalletTransactions(data.recentTransactions || []);
+    } catch (err) {
+        showToast('danger', err.message);
+    }
+}
+
+function renderWalletTransactions(transactions) {
+    const container = document.getElementById('walletTransactionsList');
+    if (!container) return;
+
+    if (!transactions || transactions.length === 0) {
+        container.innerHTML = '<div class="text-muted small">Chưa có giao dịch ví nào.</div>';
+        return;
+    }
+
+    container.innerHTML = transactions.map(transaction => {
+        const amountClass = Number(transaction.amount) >= 0 ? 'text-success' : 'text-danger';
+        return `
+            <div class="border rounded p-2 mb-2 bg-light">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="fw-semibold small">${transaction.type}</div>
+                        <div class="text-muted small">${transaction.description}</div>
+                        <div class="text-muted small">${new Date(transaction.createdAt).toLocaleString('vi-VN')}</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="fw-semibold ${amountClass}">${formatCurrency(transaction.amount)}</div>
+                        <div class="text-muted small">Số dư: ${formatCurrency(transaction.balanceAfter)}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function topUpWallet() {
+    const user = (typeof getStoredUser === 'function')
+        ? getStoredUser()
+        : JSON.parse(localStorage.getItem('user') || 'null');
+    if (!user || !user.token) return;
+
+    const amountInput = document.getElementById('topUpAmount');
+    const descriptionInput = document.getElementById('topUpDescription');
+    const amount = Number(amountInput.value || 0);
+
+    if (!amount || amount <= 0) {
+        showToast('warning', 'Vui lòng nhập số tiền nạp hợp lệ.');
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/wallet/top-up`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${user.token}`
+            },
+            body: JSON.stringify({ amount, description: descriptionInput.value })
+        });
+        const data = await res.json();
+        if (res.status === 401) { handleUnauthorized(); return; }
+        if (!res.ok) throw new Error(data.message || 'Nạp tiền thất bại');
+
+        amountInput.value = '';
+        descriptionInput.value = '';
+        showToast('success', `Nạp tiền thành công. Số dư mới: ${formatCurrency(data.walletBalance)}`);
+        renderWalletTransactions(data.recentTransactions || []);
+        loadWalletSummary();
+    } catch (err) {
+        showToast('danger', err.message);
+    }
+}
+
+async function purchaseMembership() {
+    const user = (typeof getStoredUser === 'function')
+        ? getStoredUser()
+        : JSON.parse(localStorage.getItem('user') || 'null');
+    if (!user || !user.token) return;
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/wallet/membership`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${user.token}`
+            },
+            body: JSON.stringify({
+                plan: 'MONTHLY',
+                autoRenewMembership: document.getElementById('autoRenewMembership').checked
+            })
+        });
+        const data = await res.json();
+        if (res.status === 401) { handleUnauthorized(); return; }
+        if (!res.ok) throw new Error(data.message || 'Mua vé tháng thất bại');
+
+        showToast('success', 'Mua/gia hạn vé tháng thành công.');
+        renderWalletTransactions(data.recentTransactions || []);
+        loadWalletSummary();
+    } catch (err) {
+        showToast('danger', err.message);
+    }
 }
 
 /**
