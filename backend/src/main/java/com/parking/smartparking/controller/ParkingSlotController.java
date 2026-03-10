@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -55,13 +56,15 @@ public class ParkingSlotController {
      */
     @GetMapping
     public ResponseEntity<List<ParkingSlotResponse>> getAllSlots(
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            Authentication authentication) {
         List<ParkingSlotResponse> slots;
+        String requesterEmail = authentication != null ? authentication.getName() : null;
 
         if (status != null && !status.isEmpty()) {
-            slots = parkingSlotService.getSlotsByStatus(status);
+            slots = parkingSlotService.getSlotsByStatus(status, requesterEmail);
         } else {
-            slots = parkingSlotService.getAllSlots();
+            slots = parkingSlotService.getAllSlots(requesterEmail);
         }
 
         return ResponseEntity.ok(slots);
@@ -79,15 +82,18 @@ public class ParkingSlotController {
      * @return ParkingSlotResponse
      */
     @GetMapping("/{id}")
-    public ResponseEntity<ParkingSlotResponse> getSlotById(@PathVariable Long id) {
-        ParkingSlotResponse slot = parkingSlotService.getSlotById(id);
+    public ResponseEntity<ParkingSlotResponse> getSlotById(@PathVariable Long id, Authentication authentication) {
+        String requesterEmail = authentication != null ? authentication.getName() : null;
+        ParkingSlotResponse slot = parkingSlotService.getSlotById(id, requesterEmail);
         return ResponseEntity.ok(slot);
     }
 
     @GetMapping("/recommendation")
     public ResponseEntity<ParkingRecommendationResponse> recommendSlot(
-            @RequestParam(required = false) String vehicleType) {
-        ParkingRecommendationResponse recommendation = parkingSlotService.recommendSlot(vehicleType);
+            @RequestParam(required = false) String vehicleType,
+            Authentication authentication) {
+        String requesterEmail = authentication != null ? authentication.getName() : null;
+        ParkingRecommendationResponse recommendation = parkingSlotService.recommendSlot(vehicleType, requesterEmail);
         return ResponseEntity.ok(recommendation);
     }
 
@@ -105,8 +111,9 @@ public class ParkingSlotController {
      */
     @PostMapping
     public ResponseEntity<ParkingSlotResponse> createSlot(
-            @Valid @RequestBody ParkingSlotRequest request) {
-        ParkingSlotResponse createdSlot = parkingSlotService.createSlot(request);
+            @Valid @RequestBody ParkingSlotRequest request,
+            Authentication authentication) {
+        ParkingSlotResponse createdSlot = parkingSlotService.createSlot(request, authentication.getName());
         return ResponseEntity.status(HttpStatus.CREATED).body(createdSlot);
     }
 
@@ -126,8 +133,9 @@ public class ParkingSlotController {
     @PutMapping("/{id}")
     public ResponseEntity<ParkingSlotResponse> updateSlot(
             @PathVariable Long id,
-            @Valid @RequestBody ParkingSlotRequest request) {
-        ParkingSlotResponse updatedSlot = parkingSlotService.updateSlot(id, request);
+            @Valid @RequestBody ParkingSlotRequest request,
+            Authentication authentication) {
+        ParkingSlotResponse updatedSlot = parkingSlotService.updateSlot(id, request, authentication.getName());
         return ResponseEntity.ok(updatedSlot);
     }
 
@@ -142,8 +150,8 @@ public class ParkingSlotController {
      * @return ResponseEntity<Void>
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteSlot(@PathVariable Long id) {
-        parkingSlotService.deleteSlot(id);
+    public ResponseEntity<Void> deleteSlot(@PathVariable Long id, Authentication authentication) {
+        parkingSlotService.deleteSlot(id, authentication.getName());
         return ResponseEntity.noContent().build();
     }
 }

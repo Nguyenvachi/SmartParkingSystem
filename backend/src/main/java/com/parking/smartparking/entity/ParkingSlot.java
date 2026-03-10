@@ -47,6 +47,10 @@ public class ParkingSlot {
     @Column(name = "price_per_hour", precision = 10, scale = 2)
     private BigDecimal pricePerHour = BigDecimal.valueOf(5000.00);
 
+    @Builder.Default
+    @Column(name = "branch_code", nullable = false, length = 20)
+    private String branchCode = "MAIN";
+
     /**
      * ⚠️ CỰC KỲ QUAN TRỌNG: Cột version cho Optimistic Locking
      *

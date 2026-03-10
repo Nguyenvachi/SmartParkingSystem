@@ -19,7 +19,7 @@
 
         <div class="d-flex gap-3">
             <button id="btnLogin" class="btn btn-primary btn-lg px-5 shadow-sm">Đăng Nhập</button>
-            <button id="btnDashboard" class="btn btn-outline-dark btn-lg px-5 shadow-sm">Dashboard (Demo)</button>
+            <button id="btnDashboard" class="btn btn-outline-dark btn-lg px-5 shadow-sm">Dashboard</button>
         </div>
 
         <footer class="mt-5 text-muted small">
@@ -36,7 +36,7 @@
             window.location.href = '/login';
         });
 
-        // Nút "Dashboard (Demo)" - Kiểm tra auth trước
+        // Nút "Dashboard" - Kiểm tra auth trước
         document.getElementById('btnDashboard').addEventListener('click', function () {
             let user = null;
 

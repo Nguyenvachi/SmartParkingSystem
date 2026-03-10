@@ -23,6 +23,7 @@ public class AuthResponse {
     private String fullName;
     private String email;
     private String role;
+    private String branchCode;
 
     // [FIX 2 - JWT] Token để Frontend lưu vào localStorage và gửi trong Authorization header
     private String token;

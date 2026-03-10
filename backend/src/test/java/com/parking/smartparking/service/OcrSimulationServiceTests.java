@@ -14,6 +14,7 @@ class OcrSimulationServiceTests {
     private OcrSimulationService ocrSimulationService;
 
     @BeforeEach
+    @SuppressWarnings("unused")
     void setUp() {
         ocrSimulationService = new OcrSimulationService();
         ReflectionTestUtils.setField(ocrSimulationService, "defaultConfidence", 0.91d);
@@ -45,5 +46,20 @@ class OcrSimulationServiceTests {
 
         assertTrue(response.getDetectedPlate().contains("-"));
         assertEquals("parking-photo.png", response.getFileName());
+        assertTrue(response.getConfidence() < 0.91d);
+    }
+
+    @Test
+    void shouldGenerateSafeFallbackPlateForVeryShortFileName() {
+        MockMultipartFile file = new MockMultipartFile(
+                "image",
+                "x.jpg",
+                "image/jpeg",
+                "fake".getBytes(StandardCharsets.UTF_8));
+
+        var response = ocrSimulationService.simulateRecognition(file);
+
+        assertTrue(response.getDetectedPlate().matches("[0-9]{2}[A-Z]{2}-[0-9]{5}"));
+        assertTrue(response.getConfidence() >= 0.5d);
     }
 }

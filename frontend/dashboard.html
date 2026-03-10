@@ -22,6 +22,7 @@
                     <li class="nav-item"><a class="nav-link active" href="#">Bản đồ Bãi xe</a></li>
                     <li class="nav-item"><a class="nav-link" href="#" onclick="switchSidebarTab('tabHistory'); return false;">Lịch sử</a></li>
                     <li class="nav-item"><a class="nav-link" href="#" onclick="switchSidebarTab('tabWallet'); return false;">Ví của tôi</a></li>
+                    <li class="nav-item d-none" id="navAdminItem"><a class="nav-link" href="#" onclick="scrollToAdminConsole(); return false;">Quản trị</a></li>
                 </ul>
                 <div class="d-flex align-items-center text-white">
                     <span class="me-3">Xin chào, <strong id="navUserName">...</strong></span>
@@ -158,6 +159,20 @@
                                     </button>
                                 </form>
 
+                                <form id="withdrawForm" class="mb-3">
+                                    <label class="form-label small fw-semibold">Rút tiền khỏi ví</label>
+                                    <div class="input-group input-group-sm mb-2">
+                                        <input type="number" min="1000" step="1000" class="form-control" id="withdrawAmount"
+                                            placeholder="Ví dụ: 50000">
+                                        <span class="input-group-text">VND</span>
+                                    </div>
+                                    <input type="text" class="form-control form-control-sm mb-2" id="withdrawDescription"
+                                        placeholder="Lý do rút tiền (không bắt buộc)">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm w-100">
+                                        <i class="bi bi-dash-circle me-1"></i>Rút tiền
+                                    </button>
+                                </form>
+
                                 <div class="border rounded p-2 mb-3 bg-white">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <div>
@@ -193,6 +208,153 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mt-4 d-none" id="adminConsoleSection">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Trung tâm Quản trị</h5>
+                    <div class="small text-white-50">Quản lý phân quyền, slot, blacklist và nhật ký hệ thống.</div>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <span class="badge bg-primary" id="adminRoleBadge">ROLE_ADMIN</span>
+                    <span class="badge bg-secondary" id="adminBranchBadge">ALL BRANCHES</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <ul class="nav nav-pills gap-2 mb-3" id="adminConsoleTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#adminOverviewPane" type="button">Tổng quan</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#adminSlotsPane" type="button">Quản lý Slot</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#adminBlacklistPane" type="button">Blacklist</button>
+                    </li>
+                    <li class="nav-item super-admin-only" role="presentation">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#adminUsersPane" type="button">Phân quyền User</button>
+                    </li>
+                    <li class="nav-item super-admin-only" role="presentation">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#adminAuditPane" type="button">Audit Log</button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="adminOverviewPane">
+                        <div class="row g-3" id="adminSummaryCards">
+                            <div class="col-md-2 col-6"><div class="border rounded p-3 bg-light"><div class="small text-muted">User nhìn thấy</div><div class="fs-4 fw-bold" id="summaryUsersCount">0</div></div></div>
+                            <div class="col-md-2 col-6"><div class="border rounded p-3 bg-light"><div class="small text-muted">Slot quản lý</div><div class="fs-4 fw-bold" id="summarySlotsCount">0</div></div></div>
+                            <div class="col-md-2 col-6"><div class="border rounded p-3 bg-light"><div class="small text-muted">Slot trống</div><div class="fs-4 fw-bold text-success" id="summaryAvailableCount">0</div></div></div>
+                            <div class="col-md-2 col-6"><div class="border rounded p-3 bg-light"><div class="small text-muted">Đã đặt</div><div class="fs-4 fw-bold text-warning" id="summaryReservedCount">0</div></div></div>
+                            <div class="col-md-2 col-6"><div class="border rounded p-3 bg-light"><div class="small text-muted">Đang đỗ</div><div class="fs-4 fw-bold text-danger" id="summaryOccupiedCount">0</div></div></div>
+                            <div class="col-md-2 col-6"><div class="border rounded p-3 bg-light"><div class="small text-muted">Blacklist active</div><div class="fs-4 fw-bold text-dark" id="summaryBlacklistCount">0</div></div></div>
+                        </div>
+                        <div class="alert alert-info mt-3 mb-0 small" id="adminScopeNotice">Đang tải phạm vi quản trị...</div>
+                    </div>
+
+                    <div class="tab-pane fade" id="adminSlotsPane">
+                        <div class="row g-3">
+                            <div class="col-lg-4">
+                                <form id="adminSlotForm" class="border rounded p-3 bg-light">
+                                    <input type="hidden" id="adminSlotId">
+                                    <div class="fw-semibold mb-2" id="adminSlotFormTitle">Tạo slot mới</div>
+                                    <input class="form-control form-control-sm mb-2" id="adminSlotName" placeholder="Tên slot, ví dụ A01" maxlength="10">
+                                    <select class="form-select form-select-sm mb-2" id="adminSlotType">
+                                        <option value="SEDAN">SEDAN</option>
+                                        <option value="SUV">SUV</option>
+                                    </select>
+                                    <select class="form-select form-select-sm mb-2" id="adminSlotStatus">
+                                        <option value="AVAILABLE">AVAILABLE</option>
+                                        <option value="RESERVED">RESERVED</option>
+                                        <option value="OCCUPIED">OCCUPIED</option>
+                                        <option value="MAINTENANCE">MAINTENANCE</option>
+                                    </select>
+                                    <input type="number" class="form-control form-control-sm mb-2" id="adminSlotPrice" min="0" step="1000" placeholder="Giá theo giờ">
+                                    <input class="form-control form-control-sm mb-3" id="adminSlotBranchCode" placeholder="Mã chi nhánh, ví dụ HCM">
+                                    <div class="d-flex gap-2">
+                                        <button type="submit" class="btn btn-primary btn-sm flex-fill" id="adminSlotSubmitBtn">Lưu slot</button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetAdminSlotForm()">Reset</button>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="col-lg-8">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="fw-semibold">Danh sách slot quản trị</div>
+                                    <button class="btn btn-outline-secondary btn-sm" onclick="loadAdminSlots()">Tải lại</button>
+                                </div>
+                                <div class="table-responsive border rounded">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr><th>Slot</th><th>Loại</th><th>Trạng thái</th><th>Giá</th><th>Chi nhánh</th><th class="text-end">Thao tác</th></tr>
+                                        </thead>
+                                        <tbody id="adminSlotsTableBody">
+                                            <tr><td colspan="6" class="text-center text-muted py-3">Đang tải slot...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="adminBlacklistPane">
+                        <div class="row g-3">
+                            <div class="col-lg-4">
+                                <form id="adminBlacklistForm" class="border rounded p-3 bg-light">
+                                    <div class="fw-semibold mb-2">Thêm xe vào blacklist</div>
+                                    <input class="form-control form-control-sm mb-2" id="adminBlacklistPlate" placeholder="Biển số, ví dụ 51A12345">
+                                    <input class="form-control form-control-sm mb-2" id="adminBlacklistBranchCode" placeholder="Mã chi nhánh hoặc ALL">
+                                    <textarea class="form-control form-control-sm mb-3" id="adminBlacklistReason" rows="3" placeholder="Lý do blacklist"></textarea>
+                                    <button type="submit" class="btn btn-danger btn-sm w-100">Thêm blacklist</button>
+                                </form>
+                            </div>
+                            <div class="col-lg-8">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="fw-semibold">Danh sách blacklist</div>
+                                    <button class="btn btn-outline-secondary btn-sm" onclick="loadAdminBlacklist()">Tải lại</button>
+                                </div>
+                                <div class="table-responsive border rounded">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr><th>Biển số</th><th>Chi nhánh</th><th>Lý do</th><th>Tạo bởi</th><th class="text-end">Thao tác</th></tr>
+                                        </thead>
+                                        <tbody id="adminBlacklistTableBody">
+                                            <tr><td colspan="5" class="text-center text-muted py-3">Đang tải blacklist...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="adminUsersPane">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="fw-semibold">Quản lý user và phân quyền</div>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="loadAdminUsers()">Tải lại</button>
+                        </div>
+                        <div class="table-responsive border rounded">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr><th>Họ tên</th><th>Email</th><th>Role</th><th>Chi nhánh</th><th>Ví</th><th>Tạo lúc</th><th class="text-end">Lưu</th></tr>
+                                </thead>
+                                <tbody id="adminUsersTableBody">
+                                    <tr><td colspan="7" class="text-center text-muted py-3">Đang tải user...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="adminAuditPane">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="fw-semibold">Audit log gần nhất</div>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="loadAdminAuditLogs()">Tải lại</button>
+                        </div>
+                        <div id="adminAuditList" class="border rounded p-3 bg-light">Đang tải audit logs...</div>
                     </div>
                 </div>
             </div>
@@ -303,6 +465,7 @@
             const email = urlParams.get('email');
             const fullName = urlParams.get('fullName');
             const role = urlParams.get('role');
+            const branchCode = urlParams.get('branchCode');
             const avatarUrl = urlParams.get('avatarUrl');
 
             if (userId && email) {
@@ -313,6 +476,7 @@
                     email: email,
                     fullName: fullName || '',
                     role: role,
+                    branchCode: branchCode || '',
                     avatarUrl: avatarUrl || '',
                     token: token || '',   // [FIX 5] Lưu JWT để dùng cho API calls
                     loginMethod: 'GOOGLE'
@@ -335,6 +499,7 @@
 
     <!-- Main Dashboard Logic -->
     <script src="js/main.js"></script>
+    <script src="js/admin.js"></script>
 
     <!-- Phase 3: Khởi tạo UI sau khi DOM load -->
     <script>

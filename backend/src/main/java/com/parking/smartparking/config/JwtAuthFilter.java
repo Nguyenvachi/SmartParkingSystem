@@ -7,8 +7,11 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.lang.NonNull;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.parking.smartparking.entity.User;
+import com.parking.smartparking.repository.UserRepository;
 import com.parking.smartparking.service.JwtService;
 
 import jakarta.servlet.FilterChain;
@@ -37,11 +40,12 @@ import lombok.extern.slf4j.Slf4j;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final UserRepository userRepository;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(@NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain) throws ServletException, IOException {
 
         String authHeader = request.getHeader("Authorization");
 
@@ -58,7 +62,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         // Lý do: OAuth2 session có thể đã set context trước, khiến JWT bị bỏ qua.
         if (jwtService.isTokenValid(token)) {
             String email = jwtService.extractEmail(token);
-            String role = jwtService.extractRole(token);
+            User user = userRepository.findByEmail(email).orElse(null);
+            if (user == null) {
+                log.warn("❌ JWT hợp lệ nhưng user không còn tồn tại | email={}", email);
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            String role = user.getRole().name();
 
             log.debug("✅ JWT hợp lệ | email={} | role={}", email, role);
 

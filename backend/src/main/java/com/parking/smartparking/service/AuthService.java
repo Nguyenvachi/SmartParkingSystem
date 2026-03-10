@@ -24,6 +24,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class AuthService {
 
     private final UserRepository userRepository;
@@ -67,6 +68,7 @@ public class AuthService {
                 .fullName(savedUser.getFullName())
                 .email(savedUser.getEmail())
                 .role(savedUser.getRole().name())
+                .branchCode(savedUser.getBranchCode())
                 // [FIX 2 - JWT] Sinh token ngay sau đăng ký để Frontend dùng luôn
                 .token(jwtService.generateToken(savedUser.getEmail(), savedUser.getRole().name(), savedUser.getId()))
                 .message("Đăng ký tài khoản thành công!")
@@ -104,6 +106,7 @@ public class AuthService {
                 .fullName(user.getFullName())
                 .email(user.getEmail())
                 .role(user.getRole().name())
+                .branchCode(user.getBranchCode())
                 // [FIX 2 - JWT] Sinh token để Frontend lưu và gửi trong Authorization header
                 .token(jwtService.generateToken(user.getEmail(), user.getRole().name(), user.getId()))
                 .message("Đăng nhập thành công!")

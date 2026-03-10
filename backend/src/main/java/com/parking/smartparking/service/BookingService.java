@@ -3,6 +3,8 @@ package com.parking.smartparking.service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -55,6 +57,7 @@ public class BookingService {
         private final PricingService pricingService;
         private final WalletService walletService;
         private final VoucherService voucherService;
+        private final BlacklistService blacklistService;
 
     /**
      * ===== CORE LOGIC: TẠO BOOKING VỚI OPTIMISTIC LOCKING =====
@@ -69,6 +72,7 @@ public class BookingService {
      * @return BookingResponse với QR Code đính kèm
      */
     @Transactional
+        @SuppressWarnings("null")
     public BookingResponse createBooking(String userEmail, BookingRequest request) {
 
         // Bước 1: Tìm user theo email từ JWT
@@ -76,7 +80,8 @@ public class BookingService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy user: " + userEmail));
 
         // Bước 2: Tìm slot
-        ParkingSlot slot = parkingSlotRepository.findById(request.getSlotId())
+        Long requiredSlotId = Objects.requireNonNull(request.getSlotId(), "slotId không được null");
+        ParkingSlot slot = parkingSlotRepository.findById(requiredSlotId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy slot với ID: " + request.getSlotId()));
 
         // Bước 3: Kiểm tra trạng thái slot
@@ -116,14 +121,19 @@ public class BookingService {
                 .status(Booking.BookingStatus.PENDING)
                 .bookingTime(now)
                 .expiryTime(now.plusMinutes(15)) // Hết hạn sau 15 phút (Tech Key #2)
+                .vehiclePlate(normalizeVehiclePlate(request.getVehiclePlate()))
                 .build();
 
-        Booking savedBooking = bookingRepository.save(booking);
+        Booking savedBooking = Objects.requireNonNull(bookingRepository.save(booking));
 
         // Bước 7: Sinh QR Code + Digital Signature (Tech Key #7)
         // Format: BOOKING:{id}|USER:{userId}|SLOT:{slotName}|TIME:{time}
-        String qrContent = String.format("BOOKING:%d|USER:%d|SLOT:%s|TIME:%s",
-                savedBooking.getId(), user.getId(), slot.getSlotName(), now);
+        String qrContent = qrCodeService.buildBookingPayload(
+                savedBooking.getId(),
+                user.getId(),
+                slot.getSlotName(),
+                now,
+                savedBooking.getVehiclePlate());
         String signature = qrCodeService.generateSignature(qrContent);
         String qrBase64 = qrCodeService.generateQRCode(qrContent + "|SIG:" + signature);
 
@@ -178,6 +188,9 @@ public class BookingService {
             throw new RuntimeException("Booking đã hết hạn 15 phút. Vui lòng tạo booking mới.");
         }
 
+                validateBookingQrSignature(booking);
+                blacklistService.assertVehicleAllowed(booking.getVehiclePlate(), booking.getParkingSlot().getBranchCode());
+
         booking.setStatus(Booking.BookingStatus.CHECKED_IN);
         booking.setCheckInTime(LocalDateTime.now());
 
@@ -198,11 +211,11 @@ public class BookingService {
      */
     @Transactional
     public BookingResponse checkOut(Long bookingId, String userEmail) {
-                return checkOut(bookingId, userEmail, null);
-        }
+        return checkOut(bookingId, userEmail, null);
+    }
 
-        @Transactional
-        public BookingResponse checkOut(Long bookingId, String userEmail, CheckoutRequest request) {
+    @Transactional
+    public BookingResponse checkOut(Long bookingId, String userEmail, CheckoutRequest request) {
         Booking booking = bookingRepository.findByIdAndUser_Email(bookingId, userEmail)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy booking #" + bookingId));
 
@@ -321,8 +334,28 @@ public class BookingService {
                 .totalAmount(booking.getTotalAmount())
                                 .discountAmount(booking.getDiscountAmount())
                                 .appliedVoucherCode(booking.getAppliedVoucherCode())
+                                .vehiclePlate(booking.getVehiclePlate())
                 .qrCodeBase64(booking.getQrCodeBase64())
                 .message(message)
                 .build();
     }
+
+        private void validateBookingQrSignature(Booking booking) {
+                String qrContent = qrCodeService.buildBookingPayload(
+                                booking.getId(),
+                                booking.getUser().getId(),
+                                booking.getParkingSlot().getSlotName(),
+                                booking.getBookingTime(),
+                                booking.getVehiclePlate());
+                if (!qrCodeService.verifySignature(qrContent, booking.getQrSignature())) {
+                        throw new RuntimeException("QR booking không hợp lệ hoặc đã bị chỉnh sửa.");
+                }
+        }
+
+        private String normalizeVehiclePlate(String vehiclePlate) {
+                if (vehiclePlate == null || vehiclePlate.isBlank()) {
+                        return null;
+                }
+                return vehiclePlate.trim().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
+        }
 }

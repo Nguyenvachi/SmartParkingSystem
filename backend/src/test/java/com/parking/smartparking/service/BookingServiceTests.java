@@ -1,6 +1,7 @@
 package com.parking.smartparking.service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,6 +20,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import com.parking.smartparking.controller.WebSocketController;
 import com.parking.smartparking.dto.request.BookingRequest;
+import com.parking.smartparking.entity.Booking;
 import com.parking.smartparking.entity.ParkingSlot;
 import com.parking.smartparking.entity.User;
 import com.parking.smartparking.repository.BookingRepository;
@@ -52,6 +54,9 @@ class BookingServiceTests {
 
     @Mock
     private VoucherService voucherService;
+
+        @Mock
+        private BlacklistService blacklistService;
 
     @Test
     void shouldRejectBookingWhenOptimisticLockConflictOccurs() {
@@ -93,6 +98,86 @@ class BookingServiceTests {
         verify(webSocketController, never()).sendSlotUpdate(any());
     }
 
+    @Test
+    void shouldRejectCheckInWhenQrSignatureIsInvalid() {
+        BookingService bookingService = createService();
+        User user = User.builder()
+                .id(1L)
+                .email("user@test.com")
+                .fullName("User Test")
+                .password("secret")
+                .build();
+        ParkingSlot slot = ParkingSlot.builder()
+                .id(2L)
+                .slotName("A01")
+                .type("SEDAN")
+                .status("RESERVED")
+                .branchCode("MAIN")
+                .pricePerHour(new BigDecimal("5000"))
+                .build();
+        Booking booking = Booking.builder()
+                .id(10L)
+                .user(user)
+                .parkingSlot(slot)
+                .status(Booking.BookingStatus.PENDING)
+                .bookingTime(LocalDateTime.now().minusMinutes(5))
+                .expiryTime(LocalDateTime.now().plusMinutes(10))
+                .qrSignature("tampered")
+                .vehiclePlate("29A12345")
+                .build();
+
+        when(bookingRepository.findByIdAndUser_Email(10L, "user@test.com")).thenReturn(Optional.of(booking));
+        when(qrCodeService.buildBookingPayload(any(), any(), any(), any(), any())).thenReturn("payload");
+        when(qrCodeService.verifySignature("payload", "tampered")).thenReturn(false);
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> bookingService.checkIn(10L, "user@test.com"));
+
+        assertEquals("QR booking không hợp lệ hoặc đã bị chỉnh sửa.", exception.getMessage());
+        verify(blacklistService, never()).assertVehicleAllowed(any(), any());
+    }
+
+    @Test
+    void shouldRejectCheckInWhenVehicleIsBlacklisted() {
+        BookingService bookingService = createService();
+        User user = User.builder()
+                .id(1L)
+                .email("user@test.com")
+                .fullName("User Test")
+                .password("secret")
+                .build();
+        ParkingSlot slot = ParkingSlot.builder()
+                .id(3L)
+                .slotName("B02")
+                .type("SUV")
+                .status("RESERVED")
+                .branchCode("HCM")
+                .pricePerHour(new BigDecimal("7000"))
+                .build();
+        Booking booking = Booking.builder()
+                .id(11L)
+                .user(user)
+                .parkingSlot(slot)
+                .status(Booking.BookingStatus.PENDING)
+                .bookingTime(LocalDateTime.now().minusMinutes(2))
+                .expiryTime(LocalDateTime.now().plusMinutes(10))
+                .qrSignature("valid")
+                .vehiclePlate("51F12345")
+                .build();
+
+        when(bookingRepository.findByIdAndUser_Email(11L, "user@test.com")).thenReturn(Optional.of(booking));
+        when(qrCodeService.buildBookingPayload(any(), any(), any(), any(), any())).thenReturn("payload");
+        when(qrCodeService.verifySignature("payload", "valid")).thenReturn(true);
+        org.mockito.Mockito.doThrow(new RuntimeException("Xe biển số 51F12345 đang nằm trong blacklist: Vi phạm."))
+                .when(blacklistService).assertVehicleAllowed("51F12345", "HCM");
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> bookingService.checkIn(11L, "user@test.com"));
+
+        assertEquals("Xe biển số 51F12345 đang nằm trong blacklist: Vi phạm.", exception.getMessage());
+        verify(parkingSlotRepository, never()).save(any(ParkingSlot.class));
+    }
+
     private BookingService createService() {
         return new BookingService(
                 bookingRepository,
@@ -102,6 +187,7 @@ class BookingServiceTests {
                 webSocketController,
                 pricingService,
                 walletService,
-                voucherService);
+                                voucherService,
+                                blacklistService);
     }
 }

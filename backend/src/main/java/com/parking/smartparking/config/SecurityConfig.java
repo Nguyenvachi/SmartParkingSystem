@@ -16,6 +16,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import com.parking.smartparking.service.CustomOAuth2UserService;
@@ -61,11 +62,15 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/audit-logs/**").hasAuthority("ROLE_ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/admin/summary").hasAnyAuthority("ROLE_ADMIN", "ROLE_BRANCH_ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/admin/users/**").hasAuthority("ROLE_ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/admin/users/**").hasAuthority("ROLE_ADMIN")
+                .requestMatchers("/api/blacklist/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_BRANCH_ADMIN")
                 // [FIX 4] Phân quyền theo HTTP Method cho Slot API
                 .requestMatchers(HttpMethod.GET, "/api/slots/**").permitAll() // Xem: Tự do
-                .requestMatchers(HttpMethod.POST, "/api/slots/**").hasAuthority("ROLE_ADMIN") // Tạo: Admin
-                .requestMatchers(HttpMethod.PUT, "/api/slots/**").hasAuthority("ROLE_ADMIN") // Sửa: Admin
-                .requestMatchers(HttpMethod.DELETE, "/api/slots/**").hasAuthority("ROLE_ADMIN") // Xóa: Admin
+                .requestMatchers(HttpMethod.POST, "/api/slots/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_BRANCH_ADMIN") // Tạo: Admin
+                .requestMatchers(HttpMethod.PUT, "/api/slots/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_BRANCH_ADMIN") // Sửa: Admin
+                .requestMatchers(HttpMethod.DELETE, "/api/slots/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_BRANCH_ADMIN") // Xóa: Admin
                 // Cho phép truy cập tự do
                 .requestMatchers(
                         "/api/auth/**",
@@ -100,7 +105,8 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 // [FIX 5] Trả về 401 JSON thay vì redirect khi không có token (tránh CORS redirect loop)
                 .exceptionHandling(ex -> ex
-                .authenticationEntryPoint(apiAuthEntryPoint()));
+                .authenticationEntryPoint(apiAuthEntryPoint())
+                .accessDeniedHandler(apiAccessDeniedHandler()));
 
         return http.build();
     }
@@ -115,6 +121,15 @@ public class SecurityConfig {
             response.setStatus(HttpStatus.UNAUTHORIZED.value());
             response.setContentType(MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8");
             response.getWriter().write("{\"message\":\"Bạn chưa đăng nhập hoặc token hết hạn. Vui lòng đăng nhập lại.\",\"status\":401}");
+        };
+    }
+
+    @Bean
+    public AccessDeniedHandler apiAccessDeniedHandler() {
+        return (request, response, accessDeniedException) -> {
+            response.setStatus(HttpStatus.FORBIDDEN.value());
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8");
+            response.getWriter().write("{\"message\":\"Bạn không có quyền thực hiện thao tác này.\",\"status\":403}");
         };
     }
 

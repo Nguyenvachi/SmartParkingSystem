@@ -61,6 +61,7 @@ public class WalletTransaction {
 
     public enum TransactionType {
         TOP_UP,
+        WITHDRAWAL,
         PARKING_PAYMENT,
         MEMBERSHIP_PURCHASE,
         MEMBERSHIP_RENEWAL

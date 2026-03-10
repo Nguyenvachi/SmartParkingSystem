@@ -240,6 +240,13 @@ const WalletAPI = {
         });
     },
 
+    withdraw: async (amount, description = '') => {
+        return await apiRequest('/wallet/withdraw', {
+            method: 'POST',
+            body: JSON.stringify({ amount, description })
+        });
+    },
+
     purchaseMembership: async (autoRenewMembership = false) => {
         return await apiRequest('/wallet/membership', {
             method: 'POST',

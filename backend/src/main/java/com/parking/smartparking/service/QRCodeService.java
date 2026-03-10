@@ -1,22 +1,27 @@
 package com.parking.smartparking.service;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.LocalDateTime;
+import java.util.Base64;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.WriterException;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.util.Base64;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * QRCodeService - Sinh QR Code và Chữ ký số cho vé điện tử
@@ -119,7 +124,20 @@ public class QRCodeService {
             return false;
         }
         String expectedSignature = generateSignature(content);
-        // Dùng constant-time comparison để chống timing attack
-        return expectedSignature.equals(signature);
+        return MessageDigest.isEqual(
+                expectedSignature.getBytes(StandardCharsets.UTF_8),
+                signature.getBytes(StandardCharsets.UTF_8));
+    }
+
+    public String buildBookingPayload(Long bookingId, Long userId, String slotName, LocalDateTime bookingTime, String vehiclePlate) {
+        String normalizedPlate = vehiclePlate != null && !vehiclePlate.isBlank()
+                ? vehiclePlate.trim().toUpperCase().replaceAll("[^A-Z0-9]", "")
+                : "NA";
+        return String.format("BOOKING:%d|USER:%d|SLOT:%s|TIME:%s|PLATE:%s",
+                bookingId,
+                userId,
+                slotName,
+                bookingTime,
+                normalizedPlate);
     }
 }

@@ -78,6 +78,9 @@ public class User {
     @Column(name = "auto_renew_membership", nullable = false)
     private Boolean autoRenewMembership = false;
 
+    @Column(name = "branch_code", length = 20)
+    private String branchCode;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -92,7 +95,20 @@ public class User {
      */
     public enum Role {
         ROLE_USER,
+        ROLE_BRANCH_ADMIN,
         ROLE_ADMIN
+    }
+
+    public boolean isGlobalAdmin() {
+        return role == Role.ROLE_ADMIN;
+    }
+
+    public boolean isBranchAdmin() {
+        return role == Role.ROLE_BRANCH_ADMIN;
+    }
+
+    public boolean isAdmin() {
+        return isGlobalAdmin() || isBranchAdmin();
     }
 
     public enum MembershipPlan {
