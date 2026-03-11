@@ -54,10 +54,10 @@ public class BookingService {
     private final UserRepository userRepository;
     private final QRCodeService qrCodeService;
     private final WebSocketController webSocketController;
-        private final PricingService pricingService;
-        private final WalletService walletService;
-        private final VoucherService voucherService;
-        private final BlacklistService blacklistService;
+    private final PricingService pricingService;
+    private final WalletService walletService;
+    private final VoucherService voucherService;
+    private final BlacklistService blacklistService;
 
     /**
      * ===== CORE LOGIC: TẠO BOOKING VỚI OPTIMISTIC LOCKING =====
@@ -72,7 +72,7 @@ public class BookingService {
      * @return BookingResponse với QR Code đính kèm
      */
     @Transactional
-        @SuppressWarnings("null")
+    @SuppressWarnings("null")
     public BookingResponse createBooking(String userEmail, BookingRequest request) {
 
         // Bước 1: Tìm user theo email từ JWT
@@ -188,8 +188,8 @@ public class BookingService {
             throw new RuntimeException("Booking đã hết hạn 15 phút. Vui lòng tạo booking mới.");
         }
 
-                validateBookingQrSignature(booking);
-                blacklistService.assertVehicleAllowed(booking.getVehiclePlate(), booking.getParkingSlot().getBranchCode());
+        validateBookingQrSignature(booking);
+        blacklistService.assertVehicleAllowed(booking.getVehiclePlate(), booking.getParkingSlot().getBranchCode());
 
         booking.setStatus(Booking.BookingStatus.CHECKED_IN);
         booking.setCheckInTime(LocalDateTime.now());
@@ -332,30 +332,30 @@ public class BookingService {
                 .checkInTime(booking.getCheckInTime())
                 .checkOutTime(booking.getCheckOutTime())
                 .totalAmount(booking.getTotalAmount())
-                                .discountAmount(booking.getDiscountAmount())
-                                .appliedVoucherCode(booking.getAppliedVoucherCode())
-                                .vehiclePlate(booking.getVehiclePlate())
+                .discountAmount(booking.getDiscountAmount())
+                .appliedVoucherCode(booking.getAppliedVoucherCode())
+                .vehiclePlate(booking.getVehiclePlate())
                 .qrCodeBase64(booking.getQrCodeBase64())
                 .message(message)
                 .build();
     }
 
-        private void validateBookingQrSignature(Booking booking) {
-                String qrContent = qrCodeService.buildBookingPayload(
-                                booking.getId(),
-                                booking.getUser().getId(),
-                                booking.getParkingSlot().getSlotName(),
-                                booking.getBookingTime(),
-                                booking.getVehiclePlate());
-                if (!qrCodeService.verifySignature(qrContent, booking.getQrSignature())) {
-                        throw new RuntimeException("QR booking không hợp lệ hoặc đã bị chỉnh sửa.");
-                }
+    private void validateBookingQrSignature(Booking booking) {
+        String qrContent = qrCodeService.buildBookingPayload(
+                booking.getId(),
+                booking.getUser().getId(),
+                booking.getParkingSlot().getSlotName(),
+                booking.getBookingTime(),
+                booking.getVehiclePlate());
+        if (!qrCodeService.verifySignature(qrContent, booking.getQrSignature())) {
+            throw new RuntimeException("QR booking không hợp lệ hoặc đã bị chỉnh sửa.");
         }
+    }
 
-        private String normalizeVehiclePlate(String vehiclePlate) {
-                if (vehiclePlate == null || vehiclePlate.isBlank()) {
-                        return null;
-                }
-                return vehiclePlate.trim().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
+    private String normalizeVehiclePlate(String vehiclePlate) {
+        if (vehiclePlate == null || vehiclePlate.isBlank()) {
+            return null;
         }
+        return vehiclePlate.trim().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
+    }
 }
