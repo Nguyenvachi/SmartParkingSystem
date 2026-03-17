@@ -82,6 +82,8 @@ public class SecurityConfig {
                         "/index.html",
                         "/login",
                         "/login.html",
+                        "/register",
+                        "/register.html",
                         "/dashboard",
                         "/dashboard.html",
                         "/css/**",

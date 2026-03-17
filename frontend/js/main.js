@@ -285,7 +285,8 @@ async function confirmBooking() {
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang đặt...';
 
     try {
-        const res = await fetch(`http://localhost:8080/api/bookings`, {
+        // Old (kept): const res = await fetch(`http://localhost:8080/api/bookings`, {
+        const res = await fetch(`${API_BASE_URL}/bookings`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -364,7 +365,8 @@ async function doCheckIn(bookingId) {
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang vào bãi...';
 
     try {
-        const res = await fetch(`http://localhost:8080/api/bookings/${bookingId}/checkin`, {
+        // Old (kept): const res = await fetch(`http://localhost:8080/api/bookings/${bookingId}/checkin`, {
+        const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/checkin`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${user.token}` }
         });
@@ -395,7 +397,8 @@ async function cancelBooking(bookingId) {
     if (!user || !user.token) return;
 
     try {
-        const res = await fetch(`http://localhost:8080/api/bookings/${bookingId}`, {
+        // Old (kept): const res = await fetch(`http://localhost:8080/api/bookings/${bookingId}`, {
+        const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${user.token}` }
         });
@@ -460,12 +463,14 @@ async function loadBookingHistory() {
     container.innerHTML = '<p class="text-muted text-center small py-2">Đang tải...</p>';
 
     try {
-        const res = await fetch('http://localhost:8080/api/bookings', {
+        // Old (kept): const res = await fetch('http://localhost:8080/api/bookings', {
+        const res = await fetch(`${API_BASE_URL}/bookings`, {
             headers: { 'Authorization': `Bearer ${user.token}` }
         });
         const bookings = await res.json();
         if (res.status === 401) {
-            container.innerHTML = '<p class="text-warning small text-center">Phiên đăng nhập hết hạn. <a href="/login">Đăng nhập lại</a></p>';
+            const loginUrl = (typeof FRONTEND_LOGIN_URL !== 'undefined' && FRONTEND_LOGIN_URL) ? FRONTEND_LOGIN_URL : 'login.html';
+            container.innerHTML = `<p class="text-warning small text-center">Phiên đăng nhập hết hạn. <a href="${loginUrl}">Đăng nhập lại</a></p>`;
             return;
         }
         if (!res.ok) throw new Error('Không tải được lịch sử');
