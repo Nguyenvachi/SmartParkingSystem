@@ -1,6 +1,10 @@
 package com.parking.smartparking.config;
 
+import java.util.Arrays;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.lang.NonNull;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -21,6 +25,20 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
+    // Comma-separated patterns, defaults to '*' for dev.
+    // Override via env var: APP_WS_ALLOWED_ORIGIN_PATTERNS
+    @Value("${app.ws.allowed-origin-patterns:*}")
+    private String allowedOriginPatterns;
+
+    @SuppressWarnings("null")
+    private String[] parseAllowedOriginPatterns(String csv) {
+        final String safeCsv = (csv == null) ? "" : csv;
+        return Arrays.stream(safeCsv.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .toArray(String[]::new);
+    }
+
     /**
      * Cấu hình Message Broker
      *
@@ -28,7 +46,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
      * các message gửi từ client lên server
      */
     @Override
-    public void configureMessageBroker(MessageBrokerRegistry config) {
+    public void configureMessageBroker(@NonNull MessageBrokerRegistry config) {
         // Enable simple broker cho topic
         config.enableSimpleBroker("/topic");
 
@@ -43,9 +61,14 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
      * fallback
      */
     @Override
-    public void registerStompEndpoints(StompEndpointRegistry registry) {
+    @SuppressWarnings("null")
+    public void registerStompEndpoints(@NonNull StompEndpointRegistry registry) {
+        final String[] patterns = parseAllowedOriginPatterns(allowedOriginPatterns);
+
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*") // Cho phép mọi origin (Dev only, Production cần chỉ định rõ)
+            // Old (kept): allow all origins (dev only)
+            // .setAllowedOriginPatterns("*")
+            .setAllowedOriginPatterns(patterns)
                 .withSockJS(); // Enable SockJS fallback
     }
 }
