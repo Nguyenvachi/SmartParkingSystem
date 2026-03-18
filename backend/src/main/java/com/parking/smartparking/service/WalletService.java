@@ -75,6 +75,39 @@ public class WalletService {
         return toWalletSummary(user);
     }
 
+    /**
+     * Credit wallet after a verified external payment (MoMo/VNPay).
+     * Intentionally does NOT expose a controller endpoint.
+     */
+    @Transactional
+    public WalletSummaryResponse creditTopUpFromGateway(Long userId, BigDecimal amount, String description) {
+        if (userId == null) {
+            throw new RuntimeException("Thiếu userId cho giao dịch nạp.");
+        }
+        if (amount == null || amount.signum() <= 0) {
+            throw new RuntimeException("Số tiền nạp không hợp lệ.");
+        }
+
+        User user = getUserByIdForUpdate(userId);
+
+        if (amount.compareTo(minimumTopUp) < 0) {
+            throw new RuntimeException("Số tiền nạp tối thiểu là " + minimumTopUp.toPlainString() + " VND.");
+        }
+
+        BigDecimal newBalance = user.getWalletBalance().add(amount);
+        user.setWalletBalance(newBalance);
+        userRepository.save(user);
+
+        createTransaction(
+                user,
+                WalletTransaction.TransactionType.TOP_UP,
+                amount,
+                newBalance,
+                (description != null && !description.isBlank()) ? description : "Nạp tiền qua cổng thanh toán");
+
+        return toWalletSummary(user);
+    }
+
     @Transactional
     public WalletSummaryResponse withdraw(String email, WalletWithdrawRequest request) {
         User user = getUserByEmailForUpdate(email);
