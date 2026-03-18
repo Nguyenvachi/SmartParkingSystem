@@ -18,6 +18,17 @@ let stompClient = null; // STOMP client instance
 let slotsData = {}; // Lưu trữ dữ liệu slots (key: slotName, value: slotObject)
 let unauthorizedRedirectScheduled = false;
 
+// Phase 4: Selected top-up provider for the main "Nạp tiền" button
+let selectedTopUpProvider = null;
+
+function selectTopUpProvider(provider) {
+    if (provider !== 'momo' && provider !== 'vnpay') {
+        selectedTopUpProvider = null;
+        return;
+    }
+    selectedTopUpProvider = provider;
+}
+
 function bootstrapOAuthUserFromCurrentUrl() {
     try {
         const params = new URLSearchParams(window.location.search || '');
@@ -99,10 +110,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     document.getElementById('btnTopUpMomo')?.addEventListener('click', async function () {
+        selectTopUpProvider('momo');
         await startGatewayTopUp('momo');
     });
 
     document.getElementById('btnTopUpVnpay')?.addEventListener('click', async function () {
+        selectTopUpProvider('vnpay');
         await startGatewayTopUp('vnpay');
     });
 
@@ -159,6 +172,11 @@ async function startGatewayTopUp(provider) {
     }
     if (!Number.isInteger(amount)) {
         showToast('warning', 'Số tiền VND phải là số nguyên.');
+        return;
+    }
+    // Keep in sync with backend default: app.wallet.minimum-topup=10000
+    if (amount < 10000) {
+        showToast('warning', 'Số tiền nạp tối thiểu là 10.000 VND.');
         return;
     }
 
@@ -619,7 +637,12 @@ async function doCheckOut(bookingId) {
         loadWalletSummary();
         loadAvailableVouchers();
     } catch (err) {
-        showToast('danger', err.message);
+        const msg = err?.message || String(err);
+        showToast('danger', msg);
+        if (typeof msg === 'string' && msg.toLowerCase().includes('không đủ')) {
+            // Help user recover quickly: go to Wallet tab to top-up.
+            try { switchSidebarTab('tabWallet'); } catch (e) { /* ignore */ }
+        }
     }
 }
 
@@ -851,41 +874,13 @@ function renderWalletTransactions(transactions) {
 }
 
 async function topUpWallet() {
-    const user = (typeof getStoredUser === 'function')
-        ? getStoredUser()
-        : JSON.parse(localStorage.getItem('user') || 'null');
-    if (!user || !user.token) return;
-
-    const amountInput = document.getElementById('topUpAmount');
-    const descriptionInput = document.getElementById('topUpDescription');
-    const amount = Number(amountInput.value || 0);
-
-    if (!amount || amount <= 0) {
-        showToast('warning', 'Vui lòng nhập số tiền nạp hợp lệ.');
+    // UX requirement: Top-up must be linked to payment methods (MoMo/VNPay).
+    // Use the selected provider; if none selected, ask user to choose.
+    if (!selectedTopUpProvider) {
+        showToast('warning', 'Vui lòng chọn MoMo hoặc VNPay để nạp tiền.');
         return;
     }
-
-    try {
-        const res = await fetch(`${API_BASE_URL}/wallet/top-up`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${user.token}`
-            },
-            body: JSON.stringify({ amount, description: descriptionInput.value })
-        });
-        const data = await res.json();
-        if (res.status === 401) { handleUnauthorized(); return; }
-        if (!res.ok) throw new Error(data.message || 'Nạp tiền thất bại');
-
-        amountInput.value = '';
-        descriptionInput.value = '';
-        showToast('success', `Nạp tiền thành công. Số dư mới: ${formatCurrency(data.walletBalance)}`);
-        renderWalletTransactions(data.recentTransactions || []);
-        loadWalletSummary();
-    } catch (err) {
-        showToast('danger', err.message);
-    }
+    await startGatewayTopUp(selectedTopUpProvider);
 }
 
 async function purchaseMembership() {
