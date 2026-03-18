@@ -6,14 +6,34 @@
 // Nếu đã đăng nhập (token còn hạn) thì không ở lại trang login/register.
 document.addEventListener('DOMContentLoaded', function () {
     try {
+        const path = (window.location.pathname || '').toLowerCase();
+        const isAuthPage = path.endsWith('/login') || path.endsWith('/login.html')
+            || path.endsWith('/register') || path.endsWith('/register.html');
+
+        // OAuth2 flow now returns to login page with token query params.
+        if (isAuthPage && typeof hydrateUserFromOAuth2QueryParams === 'function') {
+            try {
+                const hydrated = hydrateUserFromOAuth2QueryParams();
+                if (hydrated) {
+                    const hydratedUser = getStoredUser();
+                    if (hydratedUser && hasValidToken(hydratedUser)) {
+                        const dashboardUrl = (typeof FRONTEND_DASHBOARD_URL !== 'undefined' && FRONTEND_DASHBOARD_URL)
+                            ? FRONTEND_DASHBOARD_URL
+                            : (path.endsWith('/register') || path.endsWith('/login')) ? '/dashboard' : 'dashboard.html';
+                        window.location.replace(dashboardUrl);
+                        return;
+                    }
+                }
+            } catch (e) {
+                // ignore and continue existing flow
+            }
+        }
+
         const user = getStoredUser();
         if (!user || !hasValidToken(user)) {
             return;
         }
 
-        const path = (window.location.pathname || '').toLowerCase();
-        const isAuthPage = path.endsWith('/login') || path.endsWith('/login.html')
-            || path.endsWith('/register') || path.endsWith('/register.html');
         if (!isAuthPage) {
             return;
         }
@@ -156,12 +176,21 @@ function parseJwtPayload(token) {
     }
 
     try {
-        const payloadBase64 = token.split('.')[1];
-        if (!payloadBase64) {
+        const payloadBase64Url = token.split('.')[1];
+        if (!payloadBase64Url) {
             return null;
         }
 
-        return JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        // JWT uses Base64URL (RFC 7515). Browser atob expects standard Base64 with padding.
+        const normalized = payloadBase64Url
+            .replace(/-/g, '+')
+            .replace(/_/g, '/');
+
+        const paddingNeeded = (4 - (normalized.length % 4)) % 4;
+        const payloadBase64 = normalized + '='.repeat(paddingNeeded);
+
+        const decoded = atob(payloadBase64);
+        return JSON.parse(decoded);
     } catch (err) {
         console.warn('⚠️ Không parse được JWT payload:', err);
         return null;
@@ -173,12 +202,21 @@ function hasValidToken(user) {
         return false;
     }
 
-    const payload = parseJwtPayload(user.token);
-    if (!payload || !payload.exp) {
+    const tokenFormat = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+    if (!tokenFormat.test(user.token)) {
         return false;
     }
 
-    return Date.now() < payload.exp * 1000;
+    const payload = parseJwtPayload(user.token);
+    if (!payload || !payload.exp) {
+        // Fallback: keep session for server-side verification if payload decode fails unexpectedly.
+        // This avoids false logout loops right after OAuth2 redirect.
+        return true;
+    }
+
+    // Allow a small client clock skew to avoid false-expired redirects.
+    const clockSkewMs = 5000;
+    return Date.now() < (payload.exp * 1000 + clockSkewMs);
 }
 
 function getStoredUser() {
@@ -201,14 +239,19 @@ function clearInvalidSession() {
 
 function hydrateUserFromOAuth2QueryParams() {
     try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const userId = urlParams.get('userId');
-        const email = urlParams.get('email');
-        const fullName = urlParams.get('fullName');
-        const role = urlParams.get('role');
-        const branchCode = urlParams.get('branchCode');
-        const avatarUrl = urlParams.get('avatarUrl');
-        const token = urlParams.get('token');
+        const queryParams = new URLSearchParams(window.location.search || '');
+        const hashRaw = (window.location.hash || '').replace(/^#/, '');
+        const hashParams = new URLSearchParams(hashRaw);
+
+        const getParam = (key) => queryParams.get(key) || hashParams.get(key);
+
+        const userId = getParam('userId');
+        const email = getParam('email');
+        const fullName = getParam('fullName');
+        const role = getParam('role');
+        const branchCode = getParam('branchCode');
+        const avatarUrl = getParam('avatarUrl');
+        const token = getParam('token');
 
         if (!userId || !email || !token) {
             return false;
@@ -236,7 +279,7 @@ function hydrateUserFromOAuth2QueryParams() {
 
         localStorage.setItem('user', JSON.stringify(userData));
 
-        // Strip query params but keep the current path (/dashboard or /dashboard.html)
+        // Strip query/hash params but keep the current path
         window.history.replaceState({}, document.title, window.location.pathname);
 
         console.log('✅ Hydrated user from Google OAuth2 redirect');

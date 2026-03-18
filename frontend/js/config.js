@@ -29,10 +29,10 @@ const WS_BASE_URL = SMARTPARKING_CONFIG.WS_BASE_URL || 'http://localhost:8080/ws
 // const FRONTEND_LOGIN_URL = `${FRONTEND_BASE_URL}/login`;
 // const FRONTEND_DASHBOARD_URL = `${FRONTEND_BASE_URL}/dashboard`;
 
-// Default to actual static files for compatibility with simple hosting.
+// Default to clean URLs to avoid token/query loss on html->route rewrites.
 const FRONTEND_BASE_URL = window.location.origin;
-const FRONTEND_LOGIN_URL = SMARTPARKING_CONFIG.FRONTEND_LOGIN_URL || `${FRONTEND_BASE_URL}/login.html`;
-const FRONTEND_DASHBOARD_URL = SMARTPARKING_CONFIG.FRONTEND_DASHBOARD_URL || `${FRONTEND_BASE_URL}/dashboard.html`;
+const FRONTEND_LOGIN_URL = SMARTPARKING_CONFIG.FRONTEND_LOGIN_URL || `${FRONTEND_BASE_URL}/login`;
+const FRONTEND_DASHBOARD_URL = SMARTPARKING_CONFIG.FRONTEND_DASHBOARD_URL || `${FRONTEND_BASE_URL}/dashboard`;
 
 // OAuth2 entrypoints on backend
 // const OAUTH2_GOOGLE_AUTH_URL = 'http://localhost:8080/oauth2/authorization/google';
