@@ -1,5 +1,7 @@
 package com.parking.smartparking.service;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -11,14 +13,21 @@ import java.util.Base64;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import javax.imageio.ImageIO;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.google.zxing.BarcodeFormat;
+import com.google.zxing.BinaryBitmap;
+import com.google.zxing.MultiFormatReader;
+import com.google.zxing.NotFoundException;
+import com.google.zxing.Result;
 import com.google.zxing.WriterException;
+import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
+import com.google.zxing.common.HybridBinarizer;
 import com.google.zxing.qrcode.QRCodeWriter;
 
 import lombok.extern.slf4j.Slf4j;
@@ -70,6 +79,48 @@ public class QRCodeService {
         } catch (WriterException | IOException e) {
             log.error("❌ Lỗi sinh QR Code: {}", e.getMessage());
             return ""; // Trả về rỗng - không ngăn quá trình tạo booking
+        }
+    }
+
+    /**
+     * Decode nội dung text từ ảnh QR (Base64 PNG) đã lưu.
+     *
+     * Dùng để verify vé dựa trên đúng payload đã được ký tại thời điểm tạo
+     * booking, tránh sai lệch khi dữ liệu thời gian bị DB truncate precision.
+     *
+     * @param base64Png Base64 của ảnh PNG QR
+     * @return nội dung text trong QR, hoặc null nếu decode thất bại
+     */
+    public String decodeQRCodeBase64(String base64Png) {
+        if (base64Png == null || base64Png.isBlank()) {
+            return null;
+        }
+        try {
+            byte[] imageBytes = Base64.getDecoder().decode(base64Png);
+            BufferedImage bufferedImage = ImageIO.read(new ByteArrayInputStream(imageBytes));
+            if (bufferedImage == null) {
+                return null;
+            }
+
+            BinaryBitmap bitmap = new BinaryBitmap(
+                    new HybridBinarizer(new BufferedImageLuminanceSource(bufferedImage)));
+            Result result = new MultiFormatReader().decode(bitmap);
+            return result != null ? result.getText() : null;
+
+        } catch (IllegalArgumentException e) {
+            // Base64 decode failed
+            log.warn("❌ QR Base64 không hợp lệ: {}", e.getMessage());
+            return null;
+        } catch (NotFoundException e) {
+            // No QR code found in image
+            log.warn("❌ Không tìm thấy QR trong ảnh lưu: {}", e.getMessage());
+            return null;
+        } catch (IOException e) {
+            log.warn("❌ Lỗi đọc ảnh QR từ Base64: {}", e.getMessage());
+            return null;
+        } catch (Exception e) {
+            log.warn("❌ Lỗi decode QR: {}", e.getMessage());
+            return null;
         }
     }
 

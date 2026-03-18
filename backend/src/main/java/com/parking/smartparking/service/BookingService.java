@@ -2,6 +2,7 @@ package com.parking.smartparking.service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -114,7 +115,8 @@ public class BookingService {
         }
 
         // Bước 6: Tạo Booking record
-        LocalDateTime now = LocalDateTime.now();
+        // Normalize to seconds to keep QR payload stable across DB persistence (avoid nano precision mismatch)
+        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
         Booking booking = Booking.builder()
                 .user(user)
                 .parkingSlot(slot)
@@ -341,15 +343,44 @@ public class BookingService {
     }
 
     private void validateBookingQrSignature(Booking booking) {
+        // Fast path: verify against server-reconstructed payload
         String qrContent = qrCodeService.buildBookingPayload(
                 booking.getId(),
                 booking.getUser().getId(),
                 booking.getParkingSlot().getSlotName(),
                 booking.getBookingTime(),
                 booking.getVehiclePlate());
-        if (!qrCodeService.verifySignature(qrContent, booking.getQrSignature())) {
-            throw new RuntimeException("QR booking không hợp lệ hoặc đã bị chỉnh sửa.");
+        if (qrCodeService.verifySignature(qrContent, booking.getQrSignature())) {
+            return;
         }
+
+        // Fallback: decode QR image content saved at booking creation time.
+        // This prevents false negatives when DB truncates LocalDateTime precision (e.g., nano -> second).
+        String decodedQrText = qrCodeService.decodeQRCodeBase64(booking.getQrCodeBase64());
+        if (decodedQrText != null && !decodedQrText.isBlank()) {
+            String[] parts = decodedQrText.split("\\|SIG:", 2);
+            if (parts.length == 2) {
+                String decodedPayload = parts[0];
+                String decodedSignature = parts[1];
+                String signatureToVerify = (booking.getQrSignature() != null && !booking.getQrSignature().isBlank())
+                        ? booking.getQrSignature()
+                        : decodedSignature;
+
+                // Optional integrity check: signature in QR should match the signature stored in DB (if present)
+                if (booking.getQrSignature() != null && !booking.getQrSignature().isBlank()
+                        && decodedSignature != null
+                        && !decodedSignature.isBlank()
+                        && !booking.getQrSignature().equals(decodedSignature)) {
+                    throw new RuntimeException("QR booking không hợp lệ hoặc đã bị chỉnh sửa.");
+                }
+
+                if (qrCodeService.verifySignature(decodedPayload, signatureToVerify)) {
+                    return;
+                }
+            }
+        }
+
+        throw new RuntimeException("QR booking không hợp lệ hoặc đã bị chỉnh sửa.");
     }
 
     private String normalizeVehiclePlate(String vehiclePlate) {
