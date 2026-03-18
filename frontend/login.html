@@ -13,106 +13,72 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 
-<body class="auth-page">
+<body class="auth-page theme-minimal">
 
-    <div class="landing-orb landing-orb-left"></div>
-    <div class="landing-orb landing-orb-right"></div>
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top dashboard-navbar app-topbar">
+        <div class="container-fluid dashboard-navbar-inner">
+            <a class="navbar-brand dashboard-brand" href="index.html">
+                <span class="brand-mark"><i class="bi bi-p-square-fill"></i></span>
+                <span>
+                    <strong>Smart Parking</strong>
+                    <small>Đăng nhập hệ thống</small>
+                </span>
+            </a>
+        </div>
+    </nav>
 
-    <main class="auth-shell container py-4 py-lg-5">
-        <div class="auth-frame row g-0 overflow-hidden">
-            <div class="col-lg-5 auth-aside">
-                <div class="auth-aside-inner">
-                    <span class="eyebrow-pill auth-pill">
-                        <i class="bi bi-shield-check"></i>
-                        Bảo mật truy cập
-                    </span>
-                    <h1 class="auth-title">Đăng nhập để quản lý bãi xe theo thời gian thực.</h1>
-                    <p class="auth-text">
-                        Truy cập dashboard vận hành, lịch sử booking, ví điện tử và khu vực quản trị theo đúng phân quyền.
-                        Giao diện mới giữ nguyên toàn bộ chức năng đăng nhập hiện tại.
-                    </p>
+    <main class="auth-shell container py-4 py-lg-5 app-shell">
+        <div class="auth-layout">
+            <section class="auth-panel">
+                <span class="eyebrow-pill"><i class="bi bi-shield-check"></i> Bảo mật</span>
+                <h1 class="h3">Đăng nhập để tiếp tục</h1>
+                <p>Truy cập dashboard vận hành, lịch sử booking, ví điện tử và khu vực quản trị theo phân quyền.</p>
 
-                    <div class="auth-feature-list">
-                        <div class="auth-feature-item">
-                            <i class="bi bi-broadcast"></i>
-                            <span>Bản đồ slot realtime qua WebSocket</span>
-                        </div>
-                        <div class="auth-feature-item">
-                            <i class="bi bi-wallet2"></i>
-                            <span>Ví điện tử, membership và voucher</span>
-                        </div>
-                        <div class="auth-feature-item">
-                            <i class="bi bi-diagram-3"></i>
-                            <span>RBAC cho admin tổng và admin chi nhánh</span>
-                        </div>
-                    </div>
-
-                    <a href="index.html" class="auth-back-link">
-                        <i class="bi bi-arrow-left"></i>
-                        Quay lại trang chủ
-                    </a>
+                <div class="auth-badges">
+                    <span class="badge rounded-pill"><i class="bi bi-broadcast me-1"></i>Realtime</span>
+                    <span class="badge rounded-pill"><i class="bi bi-qr-code me-1"></i>QR Check-in</span>
+                    <span class="badge rounded-pill"><i class="bi bi-wallet2 me-1"></i>Wallet</span>
+                    <span class="badge rounded-pill"><i class="bi bi-shield-lock me-1"></i>RBAC</span>
                 </div>
-            </div>
+            </section>
 
-            <div class="col-lg-7">
-                <div class="auth-form-pane">
-                    <div class="form-signin w-100 m-auto auth-form-wrap">
-                        <div class="auth-form-header">
-                            <h2>Đăng nhập tài khoản</h2>
-                            <p>Dùng email nội bộ hoặc đăng nhập nhanh bằng Google OAuth2.</p>
-                        </div>
-
-                        <div class="card auth-card shadow-lg border-0 rounded-4">
-                            <div class="card-body p-4 p-lg-5">
-                                <form id="loginForm">
-                                    <div class="form-floating mb-3">
-                                        <input type="email" class="form-control auth-input" id="floatingInput" placeholder="name@example.com">
-                                        <label for="floatingInput">Email</label>
-                                    </div>
-                                    <div class="form-floating mb-3">
-                                        <input type="password" class="form-control auth-input" id="floatingPassword" placeholder="Password">
-                                        <label for="floatingPassword">Mật khẩu</label>
-                                    </div>
-
-                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 my-3">
-                                        <div class="form-check text-start mb-0">
-                                            <input class="form-check-input" type="checkbox" value="remember-me" id="flexCheckDefault">
-                                            <label class="form-check-label" for="flexCheckDefault">
-                                                Ghi nhớ tôi
-                                            </label>
-                                        </div>
-                                        <a href="#" class="small text-muted text-decoration-none">Quên mật khẩu?</a>
-                                    </div>
-
-                                    <button class="btn btn-brand w-100 py-3 rounded-3" type="submit">Đăng nhập</button>
-                                </form>
-
-                                <div class="auth-divider"><span>hoặc</span></div>
-
-                                <a id="googleLoginBtn" class="btn btn-outline-danger w-100 auth-google-btn" href="http://localhost:8080/oauth2/authorization/google">
-                                    <i class="bi bi-google"></i> Đăng nhập bằng Google
-                                </a>
-
-                                <div class="text-center mt-4">
-                                    <span class="text-muted">Chưa có tài khoản?</span>
-                                    <a href="register.html" class="text-decoration-none fw-semibold">Đăng ký</a>
+            <section class="app-surface">
+                <div class="app-surface-header">
+                    <div>
+                        <div class="fw-bold">Tài khoản</div>
+                        <div class="text-muted small">Email/mật khẩu hoặc Google OAuth2.</div>
+                    </div>
+                    <a href="index.html" class="btn btn-outline-secondary btn-sm">Trang chủ</a>
+                </div>
+                <div class="app-surface-body">
+                    <div class="card auth-card border-0">
+                        <div class="card-body p-0">
+                            <form id="loginForm">
+                                <div class="form-floating mb-3">
+                                    <input type="email" class="form-control auth-input" id="floatingInput" placeholder="name@example.com">
+                                    <label for="floatingInput">Email</label>
                                 </div>
-
-                                <div class="auth-note-grid mt-4">
-                                    <div class="auth-note-card">
-                                        <strong>OAuth2</strong>
-                                        <span>Đăng nhập nhanh, đồng bộ hồ sơ và token.</span>
-                                    </div>
-                                    <div class="auth-note-card">
-                                        <strong>JWT</strong>
-                                        <span>Tự kiểm tra phiên đăng nhập và điều hướng an toàn.</span>
-                                    </div>
+                                <div class="form-floating mb-3">
+                                    <input type="password" class="form-control auth-input" id="floatingPassword" placeholder="Password">
+                                    <label for="floatingPassword">Mật khẩu</label>
                                 </div>
+                                <button class="btn btn-brand w-100 py-3 rounded-3" type="submit">Đăng nhập</button>
+                            </form>
+
+                            <div class="auth-divider"><span>hoặc</span></div>
+
+                            <a id="googleLoginBtn" class="btn btn-outline-danger w-100 auth-google-btn" href="http://localhost:8080/oauth2/authorization/google">
+                                <i class="bi bi-google"></i> Đăng nhập bằng Google
+                            </a>
+
+                            <div class="text-center mt-4">
+                                <span class="text-muted">Chưa có tài khoản?</span>
+                                <a href="register.html" class="text-decoration-none fw-semibold">Đăng ký</a>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </section>
         </div>
     </main>
 

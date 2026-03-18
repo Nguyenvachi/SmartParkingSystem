@@ -15,10 +15,7 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 
-<body class="dashboard-page">
-
-    <div class="dashboard-backdrop dashboard-backdrop-top"></div>
-    <div class="dashboard-backdrop dashboard-backdrop-bottom"></div>
+<body class="dashboard-page theme-minimal">
 
     <nav class="navbar navbar-expand-lg navbar-dark sticky-top dashboard-navbar">
         <div class="container-fluid dashboard-navbar-inner">
@@ -26,7 +23,7 @@
                 <span class="brand-mark"><i class="bi bi-p-square-fill"></i></span>
                 <span>
                     <strong>Smart Parking</strong>
-                    <small>Realtime operations console</small>
+                    <small>Dashboard</small>
                 </span>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -34,18 +31,15 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
-                    <li class="nav-item"><a class="nav-link active" href="#">Bản đồ Bãi xe</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#"
-                            onclick="switchSidebarTab('tabHistory'); return false;">Lịch sử</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#"
-                            onclick="switchSidebarTab('tabWallet'); return false;">Ví của tôi</a></li>
-                    <li class="nav-item d-none" id="navAdminItem"><a class="nav-link" href="#"
-                            onclick="scrollToAdminConsole(); return false;">Quản trị</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="#">Bãi xe</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" onclick="switchSidebarTab('tabHistory'); return false;">Lịch sử</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" onclick="switchSidebarTab('tabWallet'); return false;">Ví</a></li>
+                    <li class="nav-item d-none" id="navAdminItem"><a class="nav-link" href="#" onclick="scrollToAdminConsole(); return false;">Admin</a></li>
                 </ul>
                 <div class="d-flex align-items-center text-white dashboard-userbar">
                     <div class="userbar-copy">
-                        <span class="userbar-label">Phiên đăng nhập</span>
-                        <span>Xin chào, <strong id="navUserName">...</strong></span>
+                        <span class="userbar-label">User</span>
+                        <span><strong id="navUserName">...</strong></span>
                     </div>
                     <button class="btn btn-outline-light btn-sm" id="btnLogout">
                         <i class="bi bi-box-arrow-right me-1"></i>Đăng xuất
@@ -56,56 +50,13 @@
     </nav>
 
     <div class="container dashboard-shell mt-4">
-        <section class="dashboard-hero card-glass mb-4">
-            <div class="row g-3 align-items-center">
-                <div class="col-lg-7">
-                    <span class="eyebrow-pill">
-                        <i class="bi bi-lightning-charge-fill"></i>
-                        Vận hành thời gian thực
-                    </span>
-                    <h1 class="dashboard-hero-title">Kiểm soát bản đồ bãi xe, lịch sử giao dịch và công cụ quản trị trên
-                        cùng một màn hình.</h1>
-                </div>
-                <div class="col-lg-5">
-                    <div class="dashboard-hero-stats row g-3">
-                        <div class="col-6">
-                            <div class="hero-stat-card">
-                                <span>Realtime map</span>
-                                <strong>WebSocket</strong>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="hero-stat-card">
-                                <span>Check-in</span>
-                                <strong>QR + chữ ký số</strong>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="hero-stat-card">
-                                <span>Fintech</span>
-                                <strong>Wallet ACID</strong>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="hero-stat-card">
-                                <span>Security</span>
-                                <strong>RBAC / JWT</strong>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
         <div class="row">
             <div class="col-md-8">
                 <div class="card dashboard-card shadow-sm mb-4 overflow-hidden">
                     <div
                         class="card-header dashboard-card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div>
-                            <p class="section-kicker mb-1">Map Control</p>
-                            <h5 class="mb-0 fw-bold"><i class="bi bi-grid-3x3-gap me-2"></i>Sơ đồ Bãi xe (Real-time)
-                            </h5>
+                            <h5 class="mb-0 fw-bold"><i class="bi bi-grid-3x3-gap me-2"></i>Sơ đồ bãi xe</h5>
                         </div>
                         <div class="legend-group">
                             <span class="badge bg-success me-1">Trống</span>
@@ -157,24 +108,13 @@
                         <div class="tab-content">
                             <!-- Tab Hướng dẫn -->
                             <div class="tab-pane fade show active" id="tabGuide">
-                                <div class="guide-panel card-glass mb-3">
-                                    <p class="small text-muted mb-2">Chọn ô <strong class="text-success">màu
-                                            xanh</strong> trên bản đồ để đặt chỗ.</p>
-                                    <div class="alert alert-warning small py-2 mb-0">
-                                        <i class="bi bi-exclamation-triangle me-1"></i>
-                                        Booking chỉ giữ chỗ <strong>15 phút</strong>. Hết hạn sẽ tự hủy.
-                                    </div>
-                                </div>
-                                <div class="guide-legend d-flex flex-column gap-1 mb-3">
-                                    <span><span class="badge bg-success me-1">&nbsp;</span> Trống — có thể đặt</span>
-                                    <span><span class="badge bg-warning text-dark me-1">&nbsp;</span> Đã đặt — chờ
-                                        check-in</span>
-                                    <span><span class="badge bg-danger me-1">&nbsp;</span> Đang đỗ</span>
-                                    <span><span class="badge bg-secondary me-1">&nbsp;</span> Bảo trì</span>
+                                <div class="alert alert-warning small py-2 mb-3">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>
+                                    Booking giữ chỗ <strong>15 phút</strong>.
                                 </div>
                                 <div class="side-section-block">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <h6 class="mb-0"><i class="bi bi-stars me-1 text-primary"></i>Gợi ý chỗ đỗ</h6>
+                                        <h6 class="mb-0">Gợi ý chỗ đỗ</h6>
                                         <button class="btn btn-outline-primary btn-sm"
                                             onclick="loadRecommendation()">Làm mới</button>
                                     </div>
@@ -191,7 +131,7 @@
                                 </div>
                                 <div class="side-section-block mt-3">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <h6 class="mb-0"><i class="bi bi-camera me-1 text-success"></i>OCR giả lập</h6>
+                                        <h6 class="mb-0">OCR giả lập</h6>
                                     </div>
                                     <form id="ocrForm" class="border rounded p-2 bg-light-subtle dashboard-form-card">
                                         <input class="form-control form-control-sm mb-2" type="file" id="ocrImageInput"
@@ -239,6 +179,16 @@
                                     <button type="submit" class="btn btn-success btn-sm w-100">
                                         <i class="bi bi-plus-circle me-1"></i>Nạp tiền
                                     </button>
+
+                                    <div class="d-flex gap-2 mt-2">
+                                        <button type="button" class="btn btn-outline-primary btn-sm w-50" id="btnTopUpMomo">
+                                            <i class="bi bi-wallet2 me-1"></i>MoMo
+                                        </button>
+                                        <button type="button" class="btn btn-outline-dark btn-sm w-50" id="btnTopUpVnpay">
+                                            <i class="bi bi-credit-card me-1"></i>VNPay
+                                        </button>
+                                    </div>
+                                    <div class="small text-muted mt-2">Nạp qua cổng thanh toán (sẽ chuyển sang trang MoMo/VNPay).</div>
                                 </form>
 
                                 <form id="withdrawForm" class="mb-3 dashboard-form-card">
@@ -277,8 +227,12 @@
                                 <div>
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <label class="form-label small fw-semibold mb-0">Giao dịch gần đây</label>
-                                        <button class="btn btn-outline-secondary btn-sm"
-                                            onclick="loadWalletSummary()">Tải lại</button>
+                                        <div class="d-flex gap-2">
+                                            <button class="btn btn-outline-secondary btn-sm"
+                                                onclick="loadWalletSummary()">Gần đây</button>
+                                            <button class="btn btn-outline-primary btn-sm"
+                                                onclick="loadWalletTransactionsFull()">Tất cả</button>
+                                        </div>
                                     </div>
                                     <div id="walletTransactionsList" class="small text-muted">Chưa có giao dịch ví nào.
                                     </div>
@@ -649,10 +603,10 @@
             const role = urlParams.get('role');
             const branchCode = urlParams.get('branchCode');
             const avatarUrl = urlParams.get('avatarUrl');
+            const token = urlParams.get('token');
 
-            if (userId && email) {
+            if (userId && email && token) {
                 // URLSearchParams.get() đã decode rồi -> tránh decodeURIComponent lần 2
-                const token = urlParams.get('token'); // [FIX 5] Lấy JWT token từ redirect
                 const userData = {
                     userId: Number(userId),
                     email: email,
@@ -660,7 +614,7 @@
                     role: role,
                     branchCode: branchCode || '',
                     avatarUrl: avatarUrl || '',
-                    token: token || '',   // [FIX 5] Lưu JWT để dùng cho API calls
+                    token: token,   // [FIX 5] Lưu JWT để dùng cho API calls
                     loginMethod: 'GOOGLE'
                 };
 

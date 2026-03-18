@@ -13,84 +13,72 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 
-<body class="auth-page">
+<body class="auth-page theme-minimal">
 
-    <div class="landing-orb landing-orb-left"></div>
-    <div class="landing-orb landing-orb-right"></div>
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top dashboard-navbar app-topbar">
+        <div class="container-fluid dashboard-navbar-inner">
+            <a class="navbar-brand dashboard-brand" href="index.html">
+                <span class="brand-mark"><i class="bi bi-p-square-fill"></i></span>
+                <span>
+                    <strong>Smart Parking</strong>
+                    <small>Đăng ký tài khoản</small>
+                </span>
+            </a>
+        </div>
+    </nav>
 
-    <main class="auth-shell container py-4 py-lg-5">
-        <div class="auth-frame row g-0 overflow-hidden">
-            <div class="col-lg-5 auth-aside">
-                <div class="auth-aside-inner">
-                    <span class="eyebrow-pill auth-pill">
-                        <i class="bi bi-person-plus"></i>
-                        Tạo tài khoản
-                    </span>
-                    <h1 class="auth-title">Đăng ký để bắt đầu sử dụng Smart Parking.</h1>
-                    <p class="auth-text">
-                        Sau khi đăng ký, bạn sẽ được chuyển về trang đăng nhập để vào dashboard và đặt chỗ.
-                    </p>
+    <main class="auth-shell container py-4 py-lg-5 app-shell">
+        <div class="auth-layout">
+            <section class="auth-panel">
+                <span class="eyebrow-pill"><i class="bi bi-person-plus"></i> Tạo tài khoản</span>
+                <h1 class="h3">Bắt đầu với Smart Parking</h1>
+                <p>Tạo tài khoản để đặt chỗ, dùng ví điện tử và theo dõi lịch sử giao dịch.</p>
 
-                    <div class="auth-feature-list">
-                        <div class="auth-feature-item">
-                            <i class="bi bi-shield-check"></i>
-                            <span>Mật khẩu được mã hoá (BCrypt)</span>
-                        </div>
-                        <div class="auth-feature-item">
-                            <i class="bi bi-person-badge"></i>
-                            <span>Mặc định cấp quyền ROLE_USER</span>
-                        </div>
-                        <div class="auth-feature-item">
-                            <i class="bi bi-broadcast"></i>
-                            <span>Truy cập realtime map sau đăng nhập</span>
-                        </div>
-                    </div>
-
-                    <a href="index.html" class="auth-back-link">
-                        <i class="bi bi-arrow-left"></i>
-                        Quay lại trang chủ
-                    </a>
+                <div class="auth-badges">
+                    <span class="badge rounded-pill"><i class="bi bi-person-badge me-1"></i>ROLE_USER</span>
+                    <span class="badge rounded-pill"><i class="bi bi-shield-check me-1"></i>BCrypt</span>
+                    <span class="badge rounded-pill"><i class="bi bi-clock-history me-1"></i>Lịch sử</span>
                 </div>
-            </div>
+            </section>
 
-            <div class="col-lg-7">
-                <div class="auth-form-pane">
-                    <div class="form-signin w-100 m-auto auth-form-wrap">
-                        <div class="auth-form-header">
-                            <h2>Đăng ký tài khoản</h2>
-                            <p>Nhập thông tin cơ bản để tạo tài khoản người dùng.</p>
-                        </div>
-
-                        <div class="card auth-card shadow-lg border-0 rounded-4">
-                            <div class="card-body p-4 p-lg-5">
-                                <form id="registerForm">
-                                    <div class="form-floating mb-3">
-                                        <input type="text" class="form-control auth-input" id="fullName" placeholder="Nguyễn Văn A" required>
-                                        <label for="fullName">Họ và tên</label>
-                                    </div>
-
-                                    <div class="form-floating mb-3">
-                                        <input type="email" class="form-control auth-input" id="email" placeholder="name@example.com" required>
-                                        <label for="email">Email</label>
-                                    </div>
-
-                                    <div class="form-floating mb-3">
-                                        <input type="password" class="form-control auth-input" id="password" placeholder="Password" required>
-                                        <label for="password">Mật khẩu</label>
-                                    </div>
-
-                                    <button class="btn btn-brand w-100 py-3 rounded-3" type="submit">Đăng ký</button>
-                                </form>
-
-                                <div class="text-center mt-4">
-                                    <span class="text-muted">Đã có tài khoản?</span>
-                                    <a href="login.html" class="text-decoration-none fw-semibold">Đăng nhập</a>
+            <section class="app-surface">
+                <div class="app-surface-header">
+                    <div>
+                        <div class="fw-bold">Thông tin đăng ký</div>
+                        <div class="text-muted small">Nhập thông tin cơ bản để tạo tài khoản.</div>
+                    </div>
+                    <a href="index.html" class="btn btn-outline-secondary btn-sm">Trang chủ</a>
+                </div>
+                <div class="app-surface-body">
+                    <div class="card auth-card border-0">
+                        <div class="card-body p-0">
+                            <form id="registerForm">
+                                <div class="form-floating mb-3">
+                                    <input type="text" class="form-control auth-input" id="fullName" placeholder="Nguyễn Văn A" required>
+                                    <label for="fullName">Họ và tên</label>
                                 </div>
+
+                                <div class="form-floating mb-3">
+                                    <input type="email" class="form-control auth-input" id="email" placeholder="name@example.com" required>
+                                    <label for="email">Email</label>
+                                </div>
+
+                                <div class="form-floating mb-3">
+                                    <input type="password" class="form-control auth-input" id="password" placeholder="Password" required>
+                                    <label for="password">Mật khẩu</label>
+                                </div>
+
+                                <button class="btn btn-brand w-100 py-3 rounded-3" type="submit">Đăng ký</button>
+                            </form>
+
+                            <div class="text-center mt-4">
+                                <span class="text-muted">Đã có tài khoản?</span>
+                                <a href="login.html" class="text-decoration-none fw-semibold">Đăng nhập</a>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </section>
         </div>
     </main>
 

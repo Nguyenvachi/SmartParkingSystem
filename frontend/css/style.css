@@ -1,6 +1,9 @@
 /**
  * CSS cho Smart Parking Dashboard
  * Tính năng #5 - Real-time Map Update (UI)
+ *
+ * Note (Mar 2026): File đã được tinh gọn theo usage hiện tại.
+ * - Giữ nguyên JS/APIs, chỉ tập trung theme-minimal và các selector đang được dùng.
  */
 
 :root {
@@ -20,11 +23,8 @@ html {
 body {
     font-family: 'Manrope', sans-serif;
     color: var(--brand-ink);
-    background:
-        radial-gradient(circle at top left, rgba(15, 118, 110, 0.18), transparent 32%),
-        radial-gradient(circle at bottom right, rgba(12, 35, 64, 0.16), transparent 28%),
-        linear-gradient(135deg, #f6f8fb 0%, #eef4f1 50%, #f7efe4 100%);
     min-height: 100vh;
+    background: #f6f7fb;
 }
 
 h1,
@@ -34,9 +34,7 @@ h4,
 h5,
 h6,
 .navbar-brand,
-.landing-title,
-.auth-title,
-.dashboard-hero-title {
+.landing-title {
     font-family: 'Sora', sans-serif;
 }
 
@@ -51,47 +49,6 @@ a {
     overflow-x: hidden;
 }
 
-.landing-orb,
-.dashboard-backdrop {
-    position: fixed;
-    border-radius: 999px;
-    filter: blur(14px);
-    pointer-events: none;
-    z-index: 0;
-}
-
-.landing-orb-left {
-    width: 360px;
-    height: 360px;
-    top: -120px;
-    left: -100px;
-    background: rgba(15, 118, 110, 0.18);
-}
-
-.landing-orb-right {
-    width: 320px;
-    height: 320px;
-    right: -80px;
-    bottom: -100px;
-    background: rgba(233, 168, 77, 0.18);
-}
-
-.dashboard-backdrop-top {
-    width: 420px;
-    height: 420px;
-    top: -180px;
-    right: -130px;
-    background: rgba(15, 118, 110, 0.18);
-}
-
-.dashboard-backdrop-bottom {
-    width: 360px;
-    height: 360px;
-    left: -120px;
-    bottom: -180px;
-    background: rgba(12, 35, 64, 0.18);
-}
-
 .landing-shell,
 .auth-shell,
 .dashboard-shell,
@@ -100,16 +57,9 @@ a {
     z-index: 1;
 }
 
-.card-glass,
-.landing-frame,
-.auth-frame,
-.dashboard-card,
-.dashboard-hero {
-    background: var(--brand-card);
-    backdrop-filter: blur(18px);
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    box-shadow: var(--brand-shadow);
-}
+/* ============================================
+   Landing/Auth shared components
+   ============================================ */
 
 .eyebrow-pill {
     display: inline-flex;
@@ -117,19 +67,19 @@ a {
     gap: 0.5rem;
     padding: 0.55rem 1rem;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.72);
-    color: var(--brand-accent-strong);
+    background: transparent;
+    color: var(--brand-ink);
     font-size: 0.84rem;
-    font-weight: 700;
+    font-weight: 800;
     letter-spacing: 0.02em;
-    border: 1px solid rgba(15, 118, 110, 0.16);
+    border: 1px solid var(--brand-line);
 }
 
 .btn-brand {
     background: linear-gradient(135deg, var(--brand-accent) 0%, #0b8c82 100%);
     border: 0;
     color: #fff;
-    box-shadow: 0 14px 30px rgba(15, 118, 110, 0.28);
+    box-shadow: none;
 }
 
 .btn-brand:hover,
@@ -139,35 +89,24 @@ a {
 }
 
 .btn-ghost {
-    background: rgba(255, 255, 255, 0.55);
-    border: 1px solid rgba(12, 35, 64, 0.12);
+    background: #fff;
+    border: 1px solid var(--brand-line);
     color: var(--brand-ink);
 }
 
 .btn-ghost:hover,
 .btn-ghost:focus {
-    background: rgba(255, 255, 255, 0.78);
+    background: #fff;
     color: var(--brand-ink);
-}
-
-.landing-frame {
-    border-radius: 36px;
-    padding: 2.5rem;
-}
-
-.landing-copy {
-    max-width: 640px;
 }
 
 .landing-title {
     margin: 1.25rem 0 1rem;
-    font-size: clamp(2.4rem, 5vw, 4.4rem);
+    font-size: clamp(2rem, 4vw, 3.2rem);
     line-height: 1.05;
 }
 
-.landing-text,
-.auth-text,
-.dashboard-hero-text {
+.landing-text {
     color: var(--brand-ink-soft);
     font-size: 1.02rem;
     line-height: 1.8;
@@ -180,100 +119,6 @@ a {
     margin: 1.75rem 0 2rem;
 }
 
-.landing-metrics {
-    margin-top: 0.5rem;
-}
-
-.metric-card,
-.hero-stat-card,
-.auth-note-card,
-.insight-item {
-    height: 100%;
-    padding: 1rem 1.1rem;
-    border-radius: 22px;
-    background: rgba(255, 255, 255, 0.68);
-    border: 1px solid rgba(12, 35, 64, 0.08);
-}
-
-.metric-value {
-    font-size: 1.55rem;
-    font-weight: 800;
-    font-family: 'Sora', sans-serif;
-    color: var(--brand-ink);
-}
-
-.metric-label,
-.insight-kicker,
-.hero-stat-card span,
-.auth-note-card span,
-.section-kicker,
-.userbar-label {
-    color: var(--brand-ink-soft);
-    font-size: 0.85rem;
-}
-
-.landing-preview {
-    border-radius: 30px;
-    padding: 1.4rem;
-}
-
-.preview-panel-top {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    margin-bottom: 1rem;
-    color: var(--brand-ink-soft);
-    font-weight: 700;
-}
-
-.status-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: #10b981;
-    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.15);
-}
-
-.preview-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.85rem;
-    margin-bottom: 1rem;
-}
-
-.preview-slot {
-    border-radius: 18px;
-    padding: 1.1rem 0.75rem;
-    text-align: center;
-    font-weight: 800;
-    font-family: 'Sora', sans-serif;
-}
-
-.slot-free {
-    background: linear-gradient(180deg, #d8f6ed 0%, #c1ecdf 100%);
-    color: #0f5b49;
-}
-
-.slot-booked {
-    background: linear-gradient(180deg, #fff2c9 0%, #ffe2a6 100%);
-    color: #835f11;
-}
-
-.slot-busy {
-    background: linear-gradient(180deg, #ffd8d8 0%, #ffbfbf 100%);
-    color: #8e2323;
-}
-
-.slot-maint {
-    background: linear-gradient(180deg, #ebedf2 0%, #dfe4ea 100%);
-    color: #495463;
-}
-
-.preview-insights {
-    display: grid;
-    gap: 0.75rem;
-}
-
 .landing-footer {
     display: flex;
     justify-content: space-between;
@@ -283,92 +128,16 @@ a {
     color: var(--brand-ink-soft);
 }
 
-.auth-frame {
-    border-radius: 34px;
-}
-
-.auth-aside {
-    background: linear-gradient(160deg, rgba(12, 35, 64, 0.96) 0%, rgba(14, 84, 90, 0.88) 100%);
-    color: #fff;
-}
-
-.auth-aside-inner {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    height: 100%;
-    padding: 2.5rem;
-}
-
-.auth-pill {
-    background: rgba(255, 255, 255, 0.14);
-    border-color: rgba(255, 255, 255, 0.12);
-    color: #d9fff8;
-}
-
-.auth-title {
-    margin: 1rem 0;
-    font-size: clamp(2rem, 4vw, 3.4rem);
-    line-height: 1.1;
-}
-
-.auth-feature-list {
-    display: grid;
-    gap: 0.85rem;
-    margin: 1.6rem 0 2rem;
-}
-
-.auth-feature-item {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.9rem 1rem;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 18px;
-}
-
-.auth-back-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: rgba(255, 255, 255, 0.84);
-    text-decoration: none;
-}
-
-.auth-form-pane {
-    display: flex;
-    align-items: center;
-    min-height: 100%;
-    padding: 2rem;
-}
-
-.auth-form-wrap {
-    max-width: 460px;
-}
-
-.auth-form-header {
-    margin-bottom: 1.25rem;
-}
-
-.auth-form-header h2 {
-    margin-bottom: 0.5rem;
-}
-
-.auth-form-header p {
-    margin-bottom: 0;
-    color: var(--brand-ink-soft);
-}
-
+/* Auth form bits (login/register) */
 .auth-card {
-    background: rgba(255, 255, 255, 0.82);
-    backdrop-filter: blur(14px);
+    background: #ffffff;
 }
 
 .auth-input,
-.dashboard-form-card .form-control,
-.dashboard-form-card .form-select,
 .auth-card .form-control,
-.auth-card .form-select {
+.auth-card .form-select,
+.dashboard-form-card .form-control,
+.dashboard-form-card .form-select {
     border-radius: 16px;
     border-color: rgba(12, 35, 64, 0.12);
 }
@@ -394,7 +163,7 @@ a {
     z-index: 1;
     display: inline-block;
     padding: 0 0.9rem;
-    background: rgba(255, 255, 255, 0.82);
+    background: #ffffff;
     color: var(--brand-ink-soft);
 }
 
@@ -403,29 +172,20 @@ a {
     padding: 0.9rem 1rem;
 }
 
-.auth-note-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.9rem;
-}
-
-.auth-note-card strong,
-.hero-stat-card strong,
-.insight-item strong {
-    display: block;
-    margin-bottom: 0.2rem;
-}
+/* ============================================
+   Dashboard navbar + cards
+   ============================================ */
 
 .dashboard-navbar {
     padding-top: 1rem;
 }
 
 .dashboard-navbar-inner {
-    background: rgba(12, 35, 64, 0.88);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 24px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 14px;
     padding: 0.9rem 1.1rem;
-    box-shadow: 0 14px 30px rgba(8, 23, 41, 0.22);
+    box-shadow: none;
 }
 
 .dashboard-brand {
@@ -433,6 +193,7 @@ a {
     align-items: center;
     gap: 0.85rem;
     color: #fff;
+    text-decoration: none;
 }
 
 .dashboard-brand small {
@@ -445,10 +206,10 @@ a {
 .brand-mark {
     width: 44px;
     height: 44px;
-    border-radius: 14px;
+    border-radius: 12px;
     display: grid;
     place-items: center;
-    background: linear-gradient(135deg, #18b7aa 0%, #0f766e 100%);
+    background: linear-gradient(135deg, var(--brand-accent) 0%, #0b8c82 100%);
     font-size: 1.25rem;
 }
 
@@ -472,31 +233,16 @@ a {
     align-items: flex-end;
 }
 
-.dashboard-hero {
-    border-radius: 32px;
-    padding: 2rem;
-}
-
-.dashboard-hero-title {
-    margin: 1rem 0 0.7rem;
-    font-size: clamp(1.8rem, 4vw, 3rem);
-    line-height: 1.15;
-}
-
-.dashboard-hero-stats {
-    align-content: stretch;
-}
-
-.hero-stat-card {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    min-height: 112px;
+.userbar-label {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.85rem;
 }
 
 .dashboard-card {
-    border-radius: 28px;
-    border: 0;
+    border-radius: 16px;
+    border: 1px solid var(--brand-line);
+    background: #ffffff;
+    box-shadow: var(--brand-shadow);
 }
 
 .dashboard-card-header {
@@ -505,11 +251,7 @@ a {
 }
 
 .dashboard-map-body {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(237, 244, 247, 0.74) 100%),
-        linear-gradient(90deg, rgba(15, 118, 110, 0.06) 0, rgba(15, 118, 110, 0.06) 1px, transparent 1px, transparent 48px),
-        linear-gradient(rgba(12, 35, 64, 0.03) 0, rgba(12, 35, 64, 0.03) 1px, transparent 1px, transparent 48px);
-    background-size: auto, 48px 48px, 48px 48px;
+    background: #ffffff;
 }
 
 .legend-group .badge {
@@ -521,31 +263,26 @@ a {
 }
 
 .dashboard-side-body {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(247, 250, 252, 0.84) 100%);
+    background: #ffffff;
 }
 
-.guide-panel,
 .side-section-block,
 .wallet-summary-card,
 .membership-card,
 .dashboard-form-card {
-    border-radius: 22px;
-}
-
-.guide-panel {
-    padding: 1rem;
+    border-radius: 16px;
 }
 
 .side-section-block,
 .dashboard-form-card {
     padding: 1rem;
-    background: rgba(255, 255, 255, 0.72);
+    background: #ffffff;
     border: 1px solid rgba(12, 35, 64, 0.08);
 }
 
 .wallet-summary-card {
-    background: linear-gradient(135deg, rgba(12, 35, 64, 0.95) 0%, rgba(15, 118, 110, 0.88) 100%);
-    color: #fff;
+    background: #0f172a;
+    color: #ffffff;
 }
 
 .wallet-summary-card .text-muted,
@@ -564,35 +301,34 @@ a {
 }
 
 .admin-console-header {
-    background: linear-gradient(135deg, #0c2340 0%, #143f67 100%) !important;
+    background: #0f172a !important;
 }
 
 .admin-console-body {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(245, 248, 251, 0.92) 100%);
+    background: #ffffff;
 }
 
 /* ============================================
-   1. PARKING SLOT STYLES (LƯỚI BÃI XE)
+   Parking slot styles
    ============================================ */
 
 .parking-slot {
     width: 124px;
     height: 104px;
     border: 1px solid rgba(12, 35, 64, 0.08);
-    border-radius: 22px;
+    border-radius: 16px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: transform 0.15s ease, border-color 0.15s ease;
     font-weight: 500;
-    box-shadow: 0 14px 30px rgba(12, 35, 64, 0.12);
+    box-shadow: none;
 }
 
 .parking-slot:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 18px 38px rgba(12, 35, 64, 0.18);
+    transform: translateY(-2px);
 }
 
 .slot-name {
@@ -607,10 +343,6 @@ a {
     text-transform: uppercase;
     letter-spacing: 0.08em;
 }
-
-/* ============================================
-   2. TRẠNG THÁI SLOT (MÀU SẮC)
-   ============================================ */
 
 .slot-available {
     background: linear-gradient(135deg, #d8f6ed 0%, #bcebdc 100%);
@@ -644,15 +376,12 @@ a {
     cursor: not-allowed;
 }
 
-/* ============================================
-   3. ANIMATIONS (HIỆU ỨNG CHUYỂN ĐỔI)
-   ============================================ */
-
 @keyframes pulse {
     0%,
     100% {
         opacity: 1;
     }
+
     50% {
         opacity: 0.7;
     }
@@ -662,28 +391,14 @@ a {
     animation: pulse 1s ease-in-out;
 }
 
-/* ============================================
-   4. UTILITY CLASSES
-   ============================================ */
-
-.text-success-dark {
-    color: #155724;
-}
-
-.text-warning-dark {
-    color: #856404;
-}
-
-.text-danger-dark {
-    color: #721c24;
-}
-
-.text-secondary-dark {
-    color: #383d41;
+.parking-slot.slot-selected {
+    outline: 3px solid #0d6efd;
+    outline-offset: 2px;
+    transform: scale(1.06);
 }
 
 /* ============================================
-   5. PHASE 3 — BOOKING & QR CODE STYLES
+   Booking/QR/UI helpers
    ============================================ */
 
 .booking-card {
@@ -720,12 +435,6 @@ a {
     color: #adb5bd;
 }
 
-.parking-slot.slot-selected {
-    outline: 3px solid #0d6efd;
-    outline-offset: 2px;
-    transform: scale(1.06);
-}
-
 #bookingHistoryList {
     max-height: 420px;
     overflow-y: auto;
@@ -747,7 +456,7 @@ a {
 
 .modal-content {
     border: 0;
-    border-radius: 26px;
+    border-radius: 16px;
     overflow: hidden;
     box-shadow: var(--brand-shadow);
 }
@@ -757,34 +466,141 @@ a {
 }
 
 /* ============================================
-   6. RESPONSIVE
+   Theme: minimal (used across pages)
    ============================================ */
 
+.theme-minimal {
+    --brand-ink: #0f172a;
+    --brand-ink-soft: #475569;
+    --brand-accent: #0f766e;
+    --brand-accent-strong: #0f766e;
+    --brand-card: #ffffff;
+    --brand-line: rgba(15, 23, 42, 0.10);
+    --brand-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+
+    color: var(--brand-ink);
+    background: #f6f7fb;
+}
+
+.theme-minimal .dashboard-navbar {
+    padding-top: 0.75rem;
+}
+
+/* Minimal layout helpers for a more "system" look */
+.theme-minimal .app-topbar {
+    padding-top: 0.75rem;
+}
+
+.theme-minimal .app-shell {
+    padding-top: 1.25rem;
+}
+
+.theme-minimal .app-surface {
+    background: #ffffff;
+    border: 1px solid var(--brand-line);
+    border-radius: 18px;
+    box-shadow: var(--brand-shadow);
+}
+
+.theme-minimal .app-surface-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--brand-line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.theme-minimal .app-surface-body {
+    padding: 1.25rem;
+}
+
+.theme-minimal .module-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.9rem;
+}
+
+.theme-minimal .module-card {
+    border: 1px solid var(--brand-line);
+    border-radius: 16px;
+    background: #fff;
+    padding: 1rem;
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
+}
+
+.theme-minimal .module-card-title {
+    font-weight: 800;
+    margin-bottom: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.theme-minimal .module-card-title i {
+    color: var(--brand-accent);
+}
+
+.theme-minimal .module-card-desc {
+    color: var(--brand-ink-soft);
+    margin-bottom: 0;
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
+.theme-minimal .auth-layout {
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 1.25rem;
+}
+
+.theme-minimal .auth-panel {
+    border: 1px solid var(--brand-line);
+    border-radius: 18px;
+    background: #ffffff;
+    padding: 1.25rem;
+    box-shadow: var(--brand-shadow);
+}
+
+.theme-minimal .auth-panel h1 {
+    margin: 0 0 0.4rem;
+}
+
+.theme-minimal .auth-panel p {
+    margin: 0;
+    color: var(--brand-ink-soft);
+}
+
+.theme-minimal .auth-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.theme-minimal .auth-badges .badge {
+    border: 1px solid var(--brand-line);
+    background: #fff;
+    color: var(--brand-ink);
+    font-weight: 700;
+    padding: 0.55rem 0.7rem;
+}
+
 @media (max-width: 991.98px) {
-    .landing-frame,
-    .dashboard-hero {
-        padding: 1.5rem;
-    }
-
-    .auth-aside-inner,
-    .auth-form-pane {
-        padding: 1.5rem;
-    }
-
-    .dashboard-navbar-inner {
-        border-radius: 20px;
-    }
-
     .userbar-copy {
         align-items: flex-start;
+    }
+
+    .theme-minimal .auth-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .theme-minimal .module-grid {
+        grid-template-columns: 1fr;
     }
 }
 
 @media (max-width: 768px) {
-    .landing-title {
-        font-size: 2.3rem;
-    }
-
     .landing-actions {
         flex-direction: column;
     }
@@ -794,15 +610,14 @@ a {
         width: 100%;
     }
 
-    .auth-note-grid,
-    .preview-grid {
-        grid-template-columns: 1fr 1fr;
+    .landing-footer {
+        flex-direction: column;
     }
 
     .parking-slot {
         width: 74px;
         height: 74px;
-        border-radius: 16px;
+        border-radius: 14px;
     }
 
     .slot-name {
@@ -811,9 +626,5 @@ a {
 
     .slot-status {
         font-size: 0.55rem;
-    }
-
-    .landing-footer {
-        flex-direction: column;
     }
 }

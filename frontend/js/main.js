@@ -24,9 +24,22 @@ let slotsData = {}; // Lưu trữ dữ liệu slots (key: slotName, value: slotO
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Smart Parking Dashboard đã load');
 
+    // Google OAuth2 redirect returns token in query params.
+    // Hydrate localStorage BEFORE we enforce token presence.
+    if (typeof hydrateUserFromOAuth2QueryParams === 'function') {
+        try {
+            hydrateUserFromOAuth2QueryParams();
+        } catch (e) {
+            console.warn('⚠️ OAuth2 hydrate failed:', e);
+        }
+    }
+
     // Kiểm tra token hết hạn ngay khi load trang
     const redirected = checkTokenAndRedirect();
     if (redirected) return; // Đang chuyển hướng, dừng lại
+
+    // Handle payment return params (MoMo/VNPay)
+    handlePaymentReturnParams();
 
     // Bước 1: Lấy dữ liệu slots ban đầu từ API
     fetchAllSlots();
@@ -44,6 +57,14 @@ document.addEventListener('DOMContentLoaded', function() {
         await topUpWallet();
     });
 
+    document.getElementById('btnTopUpMomo')?.addEventListener('click', async function () {
+        await startGatewayTopUp('momo');
+    });
+
+    document.getElementById('btnTopUpVnpay')?.addEventListener('click', async function () {
+        await startGatewayTopUp('vnpay');
+    });
+
     document.getElementById('withdrawForm')?.addEventListener('submit', async function (event) {
         event.preventDefault();
         await withdrawWallet();
@@ -54,6 +75,81 @@ document.addEventListener('DOMContentLoaded', function() {
         await simulateOcr();
     });
 });
+
+// ============================================
+// 2.2 PAYMENT RETURN HANDLER (MoMo/VNPay)
+// ============================================
+function handlePaymentReturnParams() {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get('payment');
+    if (!payment) return;
+
+    const provider = (params.get('provider') || '').toUpperCase();
+    const orderId = params.get('orderId') || '';
+    const message = params.get('message') || '';
+
+    if (payment === 'success') {
+        showToast('success', `Thanh toán ${provider} thành công${orderId ? ` (order ${orderId})` : ''}.`);
+        loadWalletSummary();
+    } else {
+        showToast('warning', `Thanh toán ${provider || ''} thất bại. ${message}`.trim());
+    }
+
+    // Clean URL (remove query params)
+    window.history.replaceState({}, document.title, window.location.pathname);
+}
+
+// ============================================
+// 2.3 START TOPUP VIA PAYMENT GATEWAY
+// ============================================
+async function startGatewayTopUp(provider) {
+    const user = (typeof getStoredUser === 'function')
+        ? getStoredUser()
+        : JSON.parse(localStorage.getItem('user') || 'null');
+    if (!user || !user.token) return;
+
+    const amountInput = document.getElementById('topUpAmount');
+    const descriptionInput = document.getElementById('topUpDescription');
+    const amount = Number(amountInput?.value || 0);
+
+    if (!amount || amount <= 0) {
+        showToast('warning', 'Vui lòng nhập số tiền nạp hợp lệ.');
+        return;
+    }
+    if (!Number.isInteger(amount)) {
+        showToast('warning', 'Số tiền VND phải là số nguyên.');
+        return;
+    }
+
+    const path = provider === 'momo' ? '/payments/topup/momo'
+        : provider === 'vnpay' ? '/payments/topup/vnpay'
+            : null;
+    if (!path) {
+        showToast('danger', 'Provider không hợp lệ.');
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE_URL}${path}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${user.token}`
+            },
+            body: JSON.stringify({ amount, description: descriptionInput?.value || '' })
+        });
+
+        const data = await res.json();
+        if (res.status === 401) { handleUnauthorized(); return; }
+        if (!res.ok) throw new Error(data.message || 'Không thể tạo yêu cầu thanh toán');
+        if (!data.paymentUrl) throw new Error('Gateway không trả về paymentUrl');
+
+        showToast('info', 'Đang chuyển sang cổng thanh toán...');
+        window.location.href = data.paymentUrl;
+    } catch (err) {
+        showToast('danger', err.message || String(err));
+    }
+}
 
 // ============================================
 // 2.1 KIỂM TRA TOKEN HẾT HẠN (Client-side)
@@ -330,8 +426,9 @@ async function confirmBooking() {
 function showQRModal(bookingData) {
     document.getElementById('qrBookingId').textContent = bookingData.bookingId;
     document.getElementById('qrSlotName').textContent = bookingData.slotName;
-    document.getElementById('qrExpiry').textContent =
-        new Date(bookingData.expiryTime).toLocaleTimeString('vi-VN');
+    document.getElementById('qrExpiry').textContent = bookingData.expiryTime
+        ? new Date(bookingData.expiryTime).toLocaleTimeString('vi-VN')
+        : '—';
 
     // Render ảnh QR từ Base64
     const imgEl = document.getElementById('qrCodeImage');
@@ -345,10 +442,43 @@ function showQRModal(bookingData) {
     }
 
     // Gắn bookingId vào nút check-in
-    document.getElementById('btnCheckIn').dataset.bookingId = bookingData.bookingId;
+    const checkInBtn = document.getElementById('btnCheckIn');
+    checkInBtn.dataset.bookingId = bookingData.bookingId;
+    // Add-on: nếu booking không còn PENDING thì disable check-in (để dùng modal như "view details")
+    if (bookingData.status && bookingData.status !== 'PENDING') {
+        checkInBtn.disabled = true;
+        checkInBtn.title = 'Booking không còn ở trạng thái PENDING nên không thể check-in.';
+    } else {
+        checkInBtn.disabled = false;
+        checkInBtn.title = '';
+    }
 
     const qrModal = new bootstrap.Modal(document.getElementById('qrModal'));
     qrModal.show();
+}
+
+/**
+ * Load chi tiết booking — GET /api/bookings/{id}
+ * Add-on: dùng để mở lại QR/chi tiết từ tab lịch sử.
+ */
+async function openBookingDetails(bookingId) {
+    const user = (typeof getStoredUser === 'function')
+        ? getStoredUser()
+        : JSON.parse(localStorage.getItem('user') || 'null');
+    if (!user || !user.token) return;
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}`, {
+            headers: { 'Authorization': `Bearer ${user.token}` }
+        });
+        const data = await res.json();
+        if (res.status === 401) { handleUnauthorized(); return; }
+        if (!res.ok) throw new Error(data.message || 'Không tải được chi tiết booking');
+
+        showQRModal(data);
+    } catch (err) {
+        showToast('danger', err.message);
+    }
 }
 
 /**
@@ -493,6 +623,9 @@ async function loadBookingHistory() {
                         ${b.status === 'COMPLETED' ? `<br><small class="text-success">Tổng phí: ${formatCurrency(b.totalAmount || 0)}</small>` : ''}
                     </div>
                     <div class="d-flex flex-column gap-1">
+                        <button class="btn btn-xs btn-outline-primary py-0 px-1" onclick="openBookingDetails(${b.bookingId})" title="Xem QR / Chi tiết">
+                            <i class="bi bi-qr-code"></i>
+                        </button>
                         ${b.status === 'PENDING' ? `
                             <button class="btn btn-xs btn-success py-0 px-1" onclick="doCheckIn(${b.bookingId})" title="Check-in">
                                 <i class="bi bi-box-arrow-in-right"></i>
@@ -514,6 +647,38 @@ async function loadBookingHistory() {
 
     } catch (err) {
         container.innerHTML = `<p class="text-danger small text-center">${err.message}</p>`;
+    }
+}
+
+/**
+ * Load toàn bộ giao dịch ví — GET /api/wallet/transactions
+ * Add-on: FE trước đây chỉ render recentTransactions từ GET /api/wallet.
+ */
+async function loadWalletTransactionsFull() {
+    const user = (typeof getStoredUser === 'function')
+        ? getStoredUser()
+        : JSON.parse(localStorage.getItem('user') || 'null');
+    if (!user || !user.token) return;
+
+    const container = document.getElementById('walletTransactionsList');
+    if (container) {
+        container.innerHTML = '<div class="text-muted small">Đang tải tất cả giao dịch...</div>';
+    }
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/wallet/transactions`, {
+            headers: { 'Authorization': `Bearer ${user.token}` }
+        });
+        const data = await res.json();
+        if (res.status === 401) { handleUnauthorized(); return; }
+        if (!res.ok) throw new Error(data.message || 'Không tải được danh sách giao dịch');
+
+        renderWalletTransactions(Array.isArray(data) ? data : []);
+        showToast('success', `Đã tải ${Array.isArray(data) ? data.length : 0} giao dịch.`);
+    } catch (err) {
+        if (container) {
+            container.innerHTML = `<div class="text-danger small">${err.message}</div>`;
+        }
     }
 }
 

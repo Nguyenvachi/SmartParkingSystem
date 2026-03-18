@@ -13,89 +13,60 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 
-<body class="landing-page">
+<body class="landing-page theme-minimal">
 
-    <div class="landing-orb landing-orb-left"></div>
-    <div class="landing-orb landing-orb-right"></div>
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top dashboard-navbar app-topbar">
+        <div class="container-fluid dashboard-navbar-inner">
+            <a class="navbar-brand dashboard-brand" href="index.html">
+                <span class="brand-mark"><i class="bi bi-p-square-fill"></i></span>
+                <span>
+                    <strong>Smart Parking</strong>
+                    <small>Hệ thống quản lý & đặt chỗ</small>
+                </span>
+            </a>
+        </div>
+    </nav>
 
-    <main class="landing-shell container py-4 py-lg-5">
-        <section class="landing-frame">
-            <div class="row g-4 g-xl-5 align-items-center">
-                <div class="col-lg-7">
-                    <div class="landing-copy">
+    <main class="landing-shell container py-4 py-lg-5 app-shell">
+        <section class="app-surface">
+            <div class="app-surface-body">
+                <div class="row g-4 align-items-start">
+                    <div class="col-lg-6">
                         <span class="eyebrow-pill">
-                            <i class="bi bi-broadcast-pin"></i>
-                            Smart Parking Booking System
+                            Console vận hành
                         </span>
-                        <h1 class="landing-title">Thiết kế điều hành bãi xe thông minh, trực quan và sẵn sàng.</h1>
+                        <h1 class="landing-title">Smart Parking System</h1>
                         <p class="landing-text">
-                            Giao diện được tối ưu cho luồng vận hành thực tế: xem trạng thái slot theo thời gian thực,
-                            điều hướng nhanh đến đăng nhập hoặc dashboard và trình bày dự án theo hướng hiện đại,
-                            chuyên nghiệp hơn mà không thay đổi chức năng hiện có.
+                            Theo dõi slot realtime, đặt chỗ, check-in bằng QR, thanh toán ví và quản trị theo phân quyền.
                         </p>
 
-                        <div class="landing-actions">
+                        <div class="landing-actions mb-0">
                             <button id="btnLogin" class="btn btn-brand btn-lg px-4">
-                                <i class="bi bi-person-circle me-2"></i>Đăng Nhập
+                                <i class="bi bi-person-circle me-2"></i>Đăng nhập
                             </button>
                             <button id="btnDashboard" class="btn btn-ghost btn-lg px-4">
-                                <i class="bi bi-speedometer2 me-2"></i>Mở Dashboard
+                                <i class="bi bi-speedometer2 me-2"></i>Vào Dashboard
                             </button>
                         </div>
-
-                        <div class="landing-metrics row g-3">
-                            <div class="col-sm-4">
-                                <div class="metric-card">
-                                    <div class="metric-value">20+</div>
-                                    <div class="metric-label">Slot mô phỏng trực quan</div>
-                                </div>
-                            </div>
-                            <div class="col-sm-4">
-                                <div class="metric-card">
-                                    <div class="metric-value">13</div>
-                                    <div class="metric-label">Tech key enterprise</div>
-                                </div>
-                            </div>
-                            <div class="col-sm-4">
-                                <div class="metric-card">
-                                    <div class="metric-value">24/7</div>
-                                    <div class="metric-label">Sẵn sàng giám sát vận hành</div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
-                </div>
 
-                <div class="col-lg-5">
-                    <div class="landing-preview card-glass">
-                        <div class="preview-panel-top">
-                            <span class="status-dot"></span>
-                            <span>Realtime control surface</span>
-                        </div>
-
-                        <div class="preview-grid">
-                            <div class="preview-slot slot-free">A01</div>
-                            <div class="preview-slot slot-busy">A02</div>
-                            <div class="preview-slot slot-booked">A03</div>
-                            <div class="preview-slot slot-free">A04</div>
-                            <div class="preview-slot slot-free">B01</div>
-                            <div class="preview-slot slot-maint">B02</div>
-                            <div class="preview-slot slot-free">B03</div>
-                            <div class="preview-slot slot-busy">B04</div>
-                        </div>
-
-                        <div class="preview-insights">
-                            <div class="insight-item">
-                                <span class="insight-kicker">Khả dụng</span>
-                                <strong>12 slot trống</strong>
+                    <div class="col-lg-6">
+                        <div class="module-grid">
+                            <div class="module-card">
+                                <div class="module-card-title"><i class="bi bi-broadcast"></i>Realtime Map</div>
+                                <p class="module-card-desc">Cập nhật trạng thái slot qua WebSocket.</p>
                             </div>
-                            <div class="insight-item">
-                                <span class="insight-kicker">Bảo mật</span>
-                                <strong>JWT + OAuth2 + RBAC</strong>
+                            <div class="module-card">
+                                <div class="module-card-title"><i class="bi bi-qr-code"></i>Booking & QR</div>
+                                <p class="module-card-desc">Đặt chỗ, hiển thị QR và check-in nhanh.</p>
                             </div>
-                            <div class="insight-item">
-                                <span class="insight-kicker">Realtime</span>
-                                <strong>WebSocket map update</strong>
+                            <div class="module-card">
+                                <div class="module-card-title"><i class="bi bi-wallet2"></i>Ví & Voucher</div>
+                                <p class="module-card-desc">Nạp/rút, membership, áp voucher khi check-out.</p>
+                            </div>
+                            <div class="module-card">
+                                <div class="module-card-title"><i class="bi bi-shield-lock"></i>RBAC Admin</div>
+                                <p class="module-card-desc">Quản trị slot/blacklist/audit theo phạm vi.</p>
                             </div>
                         </div>
                     </div>
@@ -104,7 +75,6 @@
         </section>
 
         <footer class="landing-footer">
-            <span>Nhóm 3 • J2EE Graduation Project</span>
             <span>Smart Parking Team © 2026</span>
         </footer>
     </main>

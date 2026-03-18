@@ -3,6 +3,30 @@
  * Kết nối với API: POST /api/auth/login, POST /api/auth/register
  */
 
+// Nếu đã đăng nhập (token còn hạn) thì không ở lại trang login/register.
+document.addEventListener('DOMContentLoaded', function () {
+    try {
+        const user = getStoredUser();
+        if (!user || !hasValidToken(user)) {
+            return;
+        }
+
+        const path = (window.location.pathname || '').toLowerCase();
+        const isAuthPage = path.endsWith('/login') || path.endsWith('/login.html')
+            || path.endsWith('/register') || path.endsWith('/register.html');
+        if (!isAuthPage) {
+            return;
+        }
+
+        const dashboardUrl = (typeof FRONTEND_DASHBOARD_URL !== 'undefined' && FRONTEND_DASHBOARD_URL)
+            ? FRONTEND_DASHBOARD_URL
+            : (path.endsWith('/register') || path.endsWith('/login')) ? '/dashboard' : 'dashboard.html';
+        window.location.replace(dashboardUrl);
+    } catch (e) {
+        // ignore
+    }
+});
+
 // ============================================
 // 1. XỬ LÝ ĐĂNG NHẬP
 // ============================================
