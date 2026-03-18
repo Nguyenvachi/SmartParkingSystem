@@ -86,23 +86,50 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <!-- Config -->
-    <script src="js/config.js"></script>
+    <script src="js/config.js?v=20260318e"></script>
 
     <!-- Auth Logic -->
-    <script src="js/auth.js"></script>
+    <script src="js/auth.js?v=20260318e"></script>
 
     <!-- Thông báo khi bị redirect do token hết hạn -->
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const reason = new URLSearchParams(window.location.search).get('reason');
-            if (reason === 'expired') {
+            const params = new URLSearchParams(window.location.search);
+            const reason = params.get('reason');
+            const oauth2Error = params.get('error');
+
+            function prependAlert(type, html) {
                 const container = document.querySelector('.card-body') || document.querySelector('main');
-                if (container) {
-                    const alert = document.createElement('div');
-                    alert.className = 'alert alert-warning alert-dismissible fade show mt-2';
-                    alert.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i><strong>Phiên đăng nhập hết hạn.</strong> Vui lòng đăng nhập lại.<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
-                    container.insertBefore(alert, container.firstChild);
+                if (!container) {
+                    return;
                 }
+
+                const alert = document.createElement('div');
+                alert.className = `alert alert-${type} alert-dismissible fade show mt-2`;
+                alert.innerHTML = `${html}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+                container.insertBefore(alert, container.firstChild);
+            }
+
+            if (reason === 'expired') {
+                prependAlert('warning', '<i class="bi bi-exclamation-triangle me-1"></i><strong>Phiên đăng nhập hết hạn.</strong> Vui lòng đăng nhập lại.');
+            }
+
+            if (oauth2Error === 'oauth2') {
+                prependAlert('danger', '<i class="bi bi-google me-1"></i><strong>Đăng nhập Google thất bại.</strong> Vui lòng thử lại và kiểm tra cấu hình OAuth2 callback.');
+            }
+
+            if (oauth2Error === 'oauth2_db') {
+                prependAlert('danger', '<i class="bi bi-database-exclamation me-1"></i><strong>Đăng nhập Google lỗi khi lưu user.</strong> Kiểm tra log backend và schema bảng users.');
+            }
+
+            try {
+                const debugReason = sessionStorage.getItem('sp_auth_redirect_reason');
+                if (debugReason) {
+                    prependAlert('info', `<i class="bi bi-bug me-1"></i><strong>Auth debug:</strong> ${debugReason}`);
+                    sessionStorage.removeItem('sp_auth_redirect_reason');
+                }
+            } catch (e) {
+                // ignore
             }
         });
     </script>

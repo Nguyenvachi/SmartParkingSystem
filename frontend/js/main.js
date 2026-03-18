@@ -16,6 +16,44 @@
 
 let stompClient = null; // STOMP client instance
 let slotsData = {}; // Lưu trữ dữ liệu slots (key: slotName, value: slotObject)
+let unauthorizedRedirectScheduled = false;
+
+function bootstrapOAuthUserFromCurrentUrl() {
+    try {
+        const params = new URLSearchParams(window.location.search || '');
+        const userId = params.get('userId');
+        const email = params.get('email');
+        const token = params.get('token');
+
+        if (!userId || !email || !token) {
+            return false;
+        }
+
+        const role = params.get('role') || 'ROLE_USER';
+        const fullName = params.get('fullName') || '';
+        const branchCode = params.get('branchCode') || '';
+        const avatarUrl = params.get('avatarUrl') || '';
+
+        const userData = {
+            userId: Number(userId),
+            email,
+            fullName,
+            role,
+            branchCode,
+            avatarUrl,
+            token,
+            loginMethod: 'GOOGLE'
+        };
+
+        localStorage.setItem('user', JSON.stringify(userData));
+        // Xóa query nhạy cảm sau khi đã lưu session
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return true;
+    } catch (e) {
+        console.warn('⚠️ bootstrapOAuthUserFromCurrentUrl failed:', e);
+        return false;
+    }
+}
 
 // ============================================
 // 2. KHỞI TẠO KHI TRANG LOAD
@@ -23,6 +61,9 @@ let slotsData = {}; // Lưu trữ dữ liệu slots (key: slotName, value: slotO
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Smart Parking Dashboard đã load');
+
+    // First priority: hydrate directly from current URL query (independent from other scripts).
+    bootstrapOAuthUserFromCurrentUrl();
 
     // Google OAuth2 redirect returns token in query params.
     // Hydrate localStorage BEFORE we enforce token presence.
@@ -162,6 +203,7 @@ function checkTokenAndRedirect() {
     if (!user || !user.token) {
         const loginUrl = (typeof FRONTEND_LOGIN_URL !== 'undefined' && FRONTEND_LOGIN_URL)
             ? FRONTEND_LOGIN_URL : '/login';
+        try { sessionStorage.setItem('sp_auth_redirect_reason', 'missing_token_on_dashboard'); } catch (e) { /* ignore */ }
         localStorage.removeItem('user');
         window.location.href = loginUrl + '?reason=expired';
         return true;
@@ -173,6 +215,7 @@ function checkTokenAndRedirect() {
         localStorage.removeItem('user');
         const loginUrl = (typeof FRONTEND_LOGIN_URL !== 'undefined' && FRONTEND_LOGIN_URL)
             ? FRONTEND_LOGIN_URL : '/login';
+        try { sessionStorage.setItem('sp_auth_redirect_reason', 'invalid_token_on_dashboard'); } catch (e) { /* ignore */ }
         window.location.href = loginUrl + '?reason=expired';
         return true;
     }
@@ -1002,9 +1045,15 @@ function showToast(type, message) {
  * Xử lý 401: xóa token hết hạn và redirect về login
  */
 function handleUnauthorized() {
+    if (unauthorizedRedirectScheduled) {
+        return;
+    }
+    unauthorizedRedirectScheduled = true;
+
     localStorage.removeItem('user');
     const loginUrl = (typeof FRONTEND_LOGIN_URL !== 'undefined' && FRONTEND_LOGIN_URL)
         ? FRONTEND_LOGIN_URL : '/login';
+    try { sessionStorage.setItem('sp_auth_redirect_reason', 'api_401_unauthorized'); } catch (e) { /* ignore */ }
     // Đóng tất cả modal đang mở (nếu có)
     document.querySelectorAll('.modal.show').forEach(el => {
         bootstrap.Modal.getInstance(el)?.hide();
