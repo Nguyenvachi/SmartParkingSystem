@@ -69,6 +69,10 @@ public class PricingService {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
 
+        if (slot == null || slot.getPricePerHour() == null || slot.getPricePerHour().signum() <= 0) {
+            throw new RuntimeException("Slot chưa có giá/giá không hợp lệ để tính phí.");
+        }
+
         LocalDateTime cursor = chargeableStart;
         BigDecimal total = BigDecimal.ZERO;
         LocalDateTime longStayBoundary = chargeableStart.plusHours(longStayThresholdHours);
@@ -85,8 +89,15 @@ public class PricingService {
                 next = longStayBoundary;
             }
 
-            long minutes = Duration.between(cursor, next).toMinutes();
-            BigDecimal hourFraction = BigDecimal.valueOf(minutes)
+            // IMPORTANT: Duration.toMinutes() floors sub-minute durations to 0.
+            // That would allow a fast checkout (< 60s) to be charged 0 VND.
+            long seconds = Duration.between(cursor, next).getSeconds();
+            if (seconds <= 0) {
+                cursor = next;
+                continue;
+            }
+            long minutesCeil = (seconds + 59) / 60; // ceil to 1-minute granularity
+            BigDecimal hourFraction = BigDecimal.valueOf(minutesCeil)
                     .divide(BigDecimal.valueOf(60), 4, RoundingMode.HALF_UP);
             BigDecimal chunkPrice = slot.getPricePerHour().multiply(hourFraction);
 
