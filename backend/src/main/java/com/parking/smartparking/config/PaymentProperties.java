@@ -24,6 +24,12 @@ public class PaymentProperties {
         private String secretKey;
         private String requestType = "captureWallet";
         private String lang = "vi";
+        private String payWithMethod;
+        private boolean allowUnsafeReturnSuccess = false;
+        private String partnerName;
+        private String storeId;
+        private Boolean autoCapture = Boolean.TRUE;
+        private String extraData = "";
     }
 
     @Data

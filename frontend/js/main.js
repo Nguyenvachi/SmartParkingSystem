@@ -20,6 +20,25 @@ let unauthorizedRedirectScheduled = false;
 
 // Phase 4: Selected top-up provider for the main "Nạp tiền" button
 let selectedTopUpProvider = null;
+let gatewayTopUpInFlight = false;
+
+function setGatewayTopUpLoading(isLoading) {
+    const btnMomo = document.getElementById('btnTopUpMomo');
+    const btnVnpay = document.getElementById('btnTopUpVnpay');
+    const btnSubmit = document.querySelector('#topUpForm button[type="submit"]');
+
+    [btnMomo, btnVnpay, btnSubmit].forEach(btn => {
+        if (!btn) return;
+        btn.disabled = isLoading;
+    });
+
+    if (btnMomo) {
+        btnMomo.textContent = isLoading ? 'Đang xử lý...' : 'MoMo';
+    }
+    if (btnVnpay) {
+        btnVnpay.textContent = isLoading ? 'Đang xử lý...' : 'VNPay';
+    }
+}
 
 function selectTopUpProvider(provider) {
     if (provider !== 'momo' && provider !== 'vnpay') {
@@ -157,6 +176,11 @@ function handlePaymentReturnParams() {
 // 2.3 START TOPUP VIA PAYMENT GATEWAY
 // ============================================
 async function startGatewayTopUp(provider) {
+    if (gatewayTopUpInFlight) {
+        showToast('warning', 'Yêu cầu nạp tiền đang được xử lý, vui lòng đợi...');
+        return;
+    }
+
     const user = (typeof getStoredUser === 'function')
         ? getStoredUser()
         : JSON.parse(localStorage.getItem('user') || 'null');
@@ -189,6 +213,9 @@ async function startGatewayTopUp(provider) {
     }
 
     try {
+        gatewayTopUpInFlight = true;
+        setGatewayTopUpLoading(true);
+
         const res = await fetch(`${API_BASE_URL}${path}`, {
             method: 'POST',
             headers: {
@@ -207,6 +234,10 @@ async function startGatewayTopUp(provider) {
         window.location.href = data.paymentUrl;
     } catch (err) {
         showToast('danger', err.message || String(err));
+    } finally {
+        // If browser navigates away, this may not run; it is still useful when API call fails.
+        gatewayTopUpInFlight = false;
+        setGatewayTopUpLoading(false);
     }
 }
 

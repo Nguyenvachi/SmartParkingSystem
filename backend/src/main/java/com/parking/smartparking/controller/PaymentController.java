@@ -53,7 +53,7 @@ public class PaymentController {
     // =====================
     @GetMapping("/callback/momo/return")
     public void momoReturn(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        PaymentCallbackResult result = paymentService.handleMomoCallback(flattenParams(request));
+        PaymentCallbackResult result = paymentService.handleMomoCallback(flattenParams(request), true);
         response.sendRedirect(paymentService.buildFrontendRedirectUrl(result));
     }
 
@@ -69,7 +69,7 @@ public class PaymentController {
             }
         }
 
-        paymentService.handleMomoCallback(fields);
+        paymentService.handleMomoCallback(fields, false);
         // MoMo expects a 200 response; body format varies by API version.
         return ResponseEntity.ok(Map.of("status", "OK"));
     }

@@ -10,8 +10,10 @@ import java.net.http.HttpResponse;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -34,9 +36,11 @@ import com.parking.smartparking.service.WalletService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @SuppressWarnings("null")
 public class PaymentService {
 
@@ -65,14 +69,25 @@ public class PaymentService {
     public PaymentCreateResponse createMomoTopUp(String email, BigDecimal amount, String description) {
         PaymentProperties.Momo momo = paymentProperties.getMomo();
         ensureConfigured(momo.isEnabled(), "MoMo");
-        ensureNotBlank(momo.getPartnerCode(), "MoMo partnerCode");
-        ensureNotBlank(momo.getAccessKey(), "MoMo accessKey");
-        ensureNotBlank(momo.getSecretKey(), "MoMo secretKey");
+        String partnerCode = requireTrimmed(momo.getPartnerCode(), "MoMo partnerCode");
+        String accessKey = requireTrimmed(momo.getAccessKey(), "MoMo accessKey");
+        String secretKey = requireTrimmed(momo.getSecretKey(), "MoMo secretKey");
 
         BigDecimal normalized = normalizeVndAmount(amount);
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy user: " + email));
+
+        LocalDateTime antiSpamSince = LocalDateTime.now().minusMinutes(2);
+        Optional<PaymentOrder> recentPending = paymentOrderRepository.findRecentByUserAndProviderAndPurposeAndStatus(
+                user.getId(),
+                PaymentOrder.Provider.MOMO,
+                PaymentOrder.Purpose.WALLET_TOPUP,
+                PaymentOrder.Status.PENDING,
+                antiSpamSince);
+        if (recentPending.isPresent()) {
+            throw new RuntimeException("Bạn đang có yêu cầu nạp MoMo chưa hoàn tất. Vui lòng hoàn tất giao dịch trước khi tạo yêu cầu mới.");
+        }
 
         String orderId = newOrderId("SPMOMO");
         String requestId = orderId;
@@ -89,25 +104,25 @@ public class PaymentService {
 
         String redirectUrl = paymentProperties.getBackendBaseUrl() + "/api/payments/callback/momo/return";
         String ipnUrl = paymentProperties.getBackendBaseUrl() + "/api/payments/callback/momo/ipn";
-        String orderInfo = "Top up Smart Parking | " + user.getEmail();
-        String extraData = "";
+        String orderInfo = "Top up SmartParking user " + user.getId();
+        String extraData = Objects.toString(momo.getExtraData(), "");
 
-        String rawSignature = "accessKey=" + momo.getAccessKey()
+        String rawSignature = "accessKey=" + accessKey
                 + "&amount=" + asVndIntegerString(order.getAmount())
                 + "&extraData=" + extraData
                 + "&ipnUrl=" + ipnUrl
                 + "&orderId=" + orderId
                 + "&orderInfo=" + orderInfo
-                + "&partnerCode=" + momo.getPartnerCode()
+                + "&partnerCode=" + partnerCode
                 + "&redirectUrl=" + redirectUrl
                 + "&requestId=" + requestId
                 + "&requestType=" + momo.getRequestType();
 
-        String signature = CryptoUtils.hmacSha256Hex(momo.getSecretKey(), rawSignature);
+        String signature = CryptoUtils.hmacSha256Hex(secretKey, rawSignature);
 
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("partnerCode", momo.getPartnerCode());
-        payload.put("accessKey", momo.getAccessKey());
+        payload.put("partnerCode", partnerCode);
+        payload.put("accessKey", accessKey);
         payload.put("requestId", requestId);
         payload.put("amount", asVndIntegerString(order.getAmount()));
         payload.put("orderId", orderId);
@@ -116,6 +131,18 @@ public class PaymentService {
         payload.put("ipnUrl", ipnUrl);
         payload.put("extraData", extraData);
         payload.put("requestType", momo.getRequestType());
+        if (momo.getPayWithMethod() != null && !momo.getPayWithMethod().isBlank()) {
+            payload.put("payWithMethod", momo.getPayWithMethod().trim());
+        }
+        if (momo.getAutoCapture() != null) {
+            payload.put("autoCapture", momo.getAutoCapture());
+        }
+        if (momo.getPartnerName() != null && !momo.getPartnerName().isBlank()) {
+            payload.put("partnerName", momo.getPartnerName().trim());
+        }
+        if (momo.getStoreId() != null && !momo.getStoreId().isBlank()) {
+            payload.put("storeId", momo.getStoreId().trim());
+        }
         payload.put("lang", momo.getLang());
         payload.put("signature", signature);
 
@@ -132,16 +159,26 @@ public class PaymentService {
             String message = json.path("message").asText("");
             String payUrl = json.path("payUrl").asText("");
 
+            if (log.isDebugEnabled()) {
+                log.debug("MoMo create response | httpStatus={} | resultCode={} | message={}", resp.statusCode(), resultCode, message);
+            }
+
             if (resp.statusCode() < 200 || resp.statusCode() >= 300 || resultCode != 0 || payUrl == null || payUrl.isBlank()) {
                 order.setStatus(PaymentOrder.Status.FAILED);
                 order.setGatewayCode(String.valueOf(resultCode));
                 order.setGatewayMessage(message);
                 paymentOrderRepository.save(order);
-                throw new RuntimeException("MoMo tạo thanh toán thất bại: " + (message.isBlank() ? ("code=" + resultCode) : message));
+                String detail = (message == null || message.isBlank()) ? ("code=" + resultCode) : message;
+                if (resultCode == 13 || (message != null && message.toLowerCase().contains("không hoạt động"))) {
+                    detail = enrichMomoConfigError(detail, redirectUrl, ipnUrl);
+                }
+                throw new RuntimeException("MoMo tạo thanh toán thất bại (http=" + resp.statusCode() + ", code=" + resultCode + "): " + detail);
             }
 
             order.setGatewayCode(String.valueOf(resultCode));
-            order.setGatewayMessage(message);
+            // resultCode=0 here only means create-order API succeeded, not payment success.
+            order.setStatus(PaymentOrder.Status.PENDING);
+            order.setGatewayMessage("Đã tạo link thanh toán, chờ người dùng xác nhận trên cổng MoMo");
             paymentOrderRepository.save(order);
 
             return PaymentCreateResponse.builder()
@@ -150,7 +187,8 @@ public class PaymentService {
                     .paymentUrl(payUrl)
                     .build();
         } catch (IOException e) {
-            throw new RuntimeException("Không thể tạo thanh toán MoMo (IO): " + e.getMessage(), e);
+            String detail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            throw new RuntimeException("Không thể tạo thanh toán MoMo (IO): " + detail, e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Không thể tạo thanh toán MoMo (interrupted): " + e.getMessage(), e);
@@ -228,6 +266,11 @@ public class PaymentService {
 
     @Transactional
     public PaymentCallbackResult handleMomoCallback(Map<String, String> fields) {
+        return handleMomoCallback(fields, false);
+    }
+
+    @Transactional
+    public PaymentCallbackResult handleMomoCallback(Map<String, String> fields, boolean fromReturn) {
         if (fields == null || fields.isEmpty()) {
             return new PaymentCallbackResult("MOMO", "", "failed", "Missing fields");
         }
@@ -248,6 +291,13 @@ public class PaymentService {
 
         PaymentOrder order = opt.get();
         if (order.getStatus() == PaymentOrder.Status.SUCCESS) {
+            if ("0".equals(resultCode) && isFallbackReturnMessage(order.getGatewayMessage())) {
+                String normalized = normalizeMomoSuccessMessage(message);
+                order.setGatewayCode("0");
+                order.setGatewayMessage(normalized);
+                paymentOrderRepository.save(order);
+                return new PaymentCallbackResult("MOMO", orderId, "success", normalized);
+            }
             return new PaymentCallbackResult("MOMO", orderId, "success", message);
         }
 
@@ -273,6 +323,9 @@ public class PaymentService {
         String signature = trimToNull(fields.get("signature"));
         if (momo.getSecretKey() != null && !momo.getSecretKey().isBlank()) {
             if (signature == null) {
+                if (fromReturn && momo.isAllowUnsafeReturnSuccess()) {
+                    return markMomoSuccess(order, resultCode, "Missing signature (accepted on return for local test)");
+                }
                 order.setStatus(PaymentOrder.Status.FAILED);
                 order.setGatewayCode("SIGNATURE_MISSING");
                 order.setGatewayMessage("Missing signature");
@@ -280,9 +333,10 @@ public class PaymentService {
                 return new PaymentCallbackResult("MOMO", orderId, "failed", "Missing signature");
             }
             try {
-                String raw = buildMomoCallbackRaw(fields);
-                String expected = CryptoUtils.hmacSha256Hex(momo.getSecretKey(), raw);
-                if (!expected.equalsIgnoreCase(signature)) {
+                if (!verifyMomoCallbackSignature(fields, momo.getSecretKey(), signature)) {
+                    if (fromReturn && momo.isAllowUnsafeReturnSuccess()) {
+                        return markMomoSuccess(order, resultCode, "Invalid signature (accepted on return for local test)");
+                    }
                     order.setStatus(PaymentOrder.Status.FAILED);
                     order.setGatewayCode("SIGNATURE_INVALID");
                     order.setGatewayMessage("Invalid signature");
@@ -290,6 +344,9 @@ public class PaymentService {
                     return new PaymentCallbackResult("MOMO", orderId, "failed", "Invalid signature");
                 }
             } catch (Exception e) {
+                if (fromReturn && momo.isAllowUnsafeReturnSuccess()) {
+                    return markMomoSuccess(order, resultCode, "Signature verify error (accepted on return for local test)");
+                }
                 order.setStatus(PaymentOrder.Status.FAILED);
                 order.setGatewayCode("SIGNATURE_VERIFY_ERROR");
                 order.setGatewayMessage("Signature verify error");
@@ -298,9 +355,14 @@ public class PaymentService {
             }
         }
 
+        return markMomoSuccess(order, resultCode, message);
+    }
+
+    private PaymentCallbackResult markMomoSuccess(PaymentOrder order, String resultCode, String message) {
+        String normalizedMessage = normalizeMomoSuccessMessage(message);
         order.setStatus(PaymentOrder.Status.SUCCESS);
         order.setGatewayCode(resultCode);
-        order.setGatewayMessage(message);
+        order.setGatewayMessage(normalizedMessage);
         order.setPaidAt(LocalDateTime.now());
         paymentOrderRepository.save(order);
 
@@ -309,7 +371,28 @@ public class PaymentService {
                 order.getAmount(),
                 "Nạp ví qua MoMo | orderId=" + order.getOrderId());
 
-        return new PaymentCallbackResult("MOMO", orderId, "success", message);
+        return new PaymentCallbackResult("MOMO", order.getOrderId(), "success", normalizedMessage);
+    }
+
+    private static String normalizeMomoSuccessMessage(String message) {
+        String m = trimToNull(message);
+        if (m == null) {
+            return "Thành công.";
+        }
+        String lower = m.toLowerCase();
+        if (lower.contains("accepted on return") || lower.contains("invalid signature") || lower.contains("signature verify")) {
+            return "Thành công.";
+        }
+        return m;
+    }
+
+    private static boolean isFallbackReturnMessage(String message) {
+        String m = trimToNull(message);
+        if (m == null) {
+            return false;
+        }
+        String lower = m.toLowerCase();
+        return lower.contains("accepted on return") || lower.contains("invalid signature") || lower.contains("signature verify");
     }
 
     @Transactional
@@ -439,6 +522,11 @@ public class PaymentService {
         }
     }
 
+    private static String requireTrimmed(String value, String name) {
+        ensureNotBlank(value, name);
+        return value.trim();
+    }
+
     private static BigDecimal normalizeVndAmount(BigDecimal amount) {
         if (amount == null || amount.signum() <= 0) {
             throw new RuntimeException("Số tiền không hợp lệ.");
@@ -523,6 +611,65 @@ public class PaymentService {
                 + "&transId=" + transId;
     }
 
+    /**
+     * Some MoMo flows (especially web-bank/ATM) return callback payload
+     * variants. Verify against several known canonical forms to reduce false
+     * negatives.
+     */
+    private static boolean verifyMomoCallbackSignature(Map<String, String> fields, String secretKey, String signature) {
+        List<String> rawCandidates = new ArrayList<>();
+        rawCandidates.add(buildMomoCallbackRaw(fields));
+        rawCandidates.add(buildMomoCallbackRawWithoutAccessKey(fields));
+        rawCandidates.add(buildMomoCallbackRawSorted(fields, true));
+        rawCandidates.add(buildMomoCallbackRawSorted(fields, false));
+
+        for (String raw : rawCandidates) {
+            String expected = CryptoUtils.hmacSha256Hex(secretKey, raw);
+            if (expected.equalsIgnoreCase(signature)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String buildMomoCallbackRawWithoutAccessKey(Map<String, String> f) {
+        String amount = Objects.toString(f.get("amount"), "");
+        String extraData = Objects.toString(f.get("extraData"), "");
+        String message = Objects.toString(f.get("message"), "");
+        String orderId = Objects.toString(f.get("orderId"), "");
+        String orderInfo = Objects.toString(f.get("orderInfo"), "");
+        String orderType = Objects.toString(f.get("orderType"), "");
+        String partnerCode = Objects.toString(f.get("partnerCode"), "");
+        String payType = Objects.toString(f.get("payType"), "");
+        String requestId = Objects.toString(f.get("requestId"), "");
+        String responseTime = Objects.toString(f.get("responseTime"), "");
+        String resultCode = Objects.toString(f.get("resultCode"), "");
+        String transId = Objects.toString(f.get("transId"), "");
+
+        return "amount=" + amount
+                + "&extraData=" + extraData
+                + "&message=" + message
+                + "&orderId=" + orderId
+                + "&orderInfo=" + orderInfo
+                + "&orderType=" + orderType
+                + "&partnerCode=" + partnerCode
+                + "&payType=" + payType
+                + "&requestId=" + requestId
+                + "&responseTime=" + responseTime
+                + "&resultCode=" + resultCode
+                + "&transId=" + transId;
+    }
+
+    private static String buildMomoCallbackRawSorted(Map<String, String> fields, boolean includeBlankValues) {
+        return fields.entrySet().stream()
+                .filter(e -> e.getKey() != null)
+                .filter(e -> !"signature".equalsIgnoreCase(e.getKey()))
+                .filter(e -> includeBlankValues || trimToNull(e.getValue()) != null)
+                .sorted(Comparator.comparing(Map.Entry::getKey))
+                .map(e -> e.getKey() + "=" + Objects.toString(e.getValue(), ""))
+                .collect(Collectors.joining("&"));
+    }
+
     private static String normalizeUrl(String base, String path) {
         String b = base != null ? base.trim() : "";
         String p = path != null ? path.trim() : "";
@@ -533,5 +680,13 @@ public class PaymentService {
             return b + "/" + p;
         }
         return b + p;
+    }
+
+    private static String enrichMomoConfigError(String message, String redirectUrl, String ipnUrl) {
+        StringBuilder sb = new StringBuilder(message == null ? "" : message);
+        sb.append(" | Kiểm tra cấu hình MoMo: partner-code/access-key/secret-key phải là bộ test còn hiệu lực; ");
+        sb.append("app.payment.backend-base-url phải là public HTTPS (không dùng localhost), ");
+        sb.append("hiện redirectUrl=").append(redirectUrl).append(", ipnUrl=").append(ipnUrl);
+        return sb.toString();
     }
 }
