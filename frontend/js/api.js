@@ -4,7 +4,8 @@
  */
 
 const API_CONFIG = {
-    BASE_URL: 'http://localhost:8080/api',
+    // Prefer shared config from config.js when available.
+    BASE_URL: (typeof API_BASE_URL !== 'undefined' && API_BASE_URL) ? API_BASE_URL : `${window.location.origin}/api`,
     TIMEOUT: 10000 // 10 giây
 };
 

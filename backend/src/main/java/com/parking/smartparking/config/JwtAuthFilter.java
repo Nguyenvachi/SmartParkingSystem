@@ -3,11 +3,11 @@ package com.parking.smartparking.config;
 import java.io.IOException;
 import java.util.List;
 
+import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
-import org.springframework.lang.NonNull;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.parking.smartparking.entity.User;
@@ -66,6 +66,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             if (user == null) {
                 log.warn("❌ JWT hợp lệ nhưng user không còn tồn tại | email={}", email);
                 filterChain.doFilter(request, response);
+                return;
+            }
+
+            if (!Boolean.TRUE.equals(user.getIsActive())) {
+                log.warn("⛔ User bị disable nhưng vẫn gửi JWT | email={} | URI={}", email, request.getRequestURI());
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setContentType("application/json; charset=UTF-8");
+                response.getWriter().write("{\"message\":\"Tài khoản đã bị vô hiệu hóa.\"}");
                 return;
             }
 

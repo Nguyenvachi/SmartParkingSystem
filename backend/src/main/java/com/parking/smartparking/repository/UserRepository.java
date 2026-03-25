@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -59,6 +61,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     default List<User> findAllManagedUsers() {
         return findAll(Sort.by(Sort.Order.asc("role"), Sort.Order.asc("fullName"), Sort.Order.asc("email")));
     }
+
+    Page<User> findByEmailContainingIgnoreCaseOrFullNameContainingIgnoreCase(
+            String email,
+            String fullName,
+            Pageable pageable);
 
     List<User> findByBranchCodeOrderByRoleAscFullNameAscEmailAsc(String branchCode);
 }

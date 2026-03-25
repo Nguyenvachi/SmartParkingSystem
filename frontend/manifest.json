@@ -1,0 +1,16 @@
+{
+    "name": "Smart Parking",
+    "short_name": "SmartParking",
+    "start_url": "/login",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#0d6efd",
+    "icons": [
+        {
+            "src": "/assets/icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        }
+    ]
+}
