@@ -2,6 +2,15 @@ let adminSlotsCache = [];
 let adminBlacklistCache = [];
 let adminUsersCache = [];
 
+const adminUsersQuery = {
+    q: '',
+    page: 0,
+    size: 20,
+    sortBy: 'createdAt',
+    sortDir: 'desc',
+    totalPages: 1
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     initializeAdminConsole();
 });
@@ -359,10 +368,43 @@ async function loadAdminUsers() {
     const tbody = document.getElementById('adminUsersTableBody');
     if (!tbody) return;
 
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Đang tải user...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Đang tải user...</td></tr>';
     try {
-        adminUsersCache = await adminApiRequest('/admin/users', { method: 'GET' });
+        const keyword = (document.getElementById('adminUserSearchInput')?.value || '').trim();
+        const sortBy = document.getElementById('adminUserSortBy')?.value || adminUsersQuery.sortBy;
+        const sortDir = document.getElementById('adminUserSortDir')?.value || adminUsersQuery.sortDir;
+
+        if (keyword !== adminUsersQuery.q || sortBy !== adminUsersQuery.sortBy || sortDir !== adminUsersQuery.sortDir) {
+            adminUsersQuery.q = keyword;
+            adminUsersQuery.sortBy = sortBy;
+            adminUsersQuery.sortDir = sortDir;
+            adminUsersQuery.page = 0;
+        }
+
+        const params = new URLSearchParams({
+            q: adminUsersQuery.q,
+            page: String(adminUsersQuery.page),
+            size: String(adminUsersQuery.size),
+            sortBy: adminUsersQuery.sortBy,
+            sortDir: adminUsersQuery.sortDir
+        });
+
+        const paged = await adminApiRequest(`/admin/users/search?${params.toString()}`, { method: 'GET' });
+        adminUsersCache = Array.isArray(paged?.items) ? paged.items : [];
+        adminUsersQuery.totalPages = Number(paged?.totalPages || 1) || 1;
+
+        const pageInfo = document.getElementById('adminUserPageInfo');
+        if (pageInfo) {
+            const currentPageDisplay = Number(paged?.page || 0) + 1;
+            pageInfo.textContent = `Trang ${currentPageDisplay}/${adminUsersQuery.totalPages}`;
+        }
+
         const currentUser = getDashboardUser();
+
+        if (!adminUsersCache.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Không có user phù hợp.</td></tr>';
+            return;
+        }
 
         tbody.innerHTML = adminUsersCache.map(user => `
             <tr>
@@ -376,17 +418,68 @@ async function loadAdminUsers() {
                     </select>
                 </td>
                 <td><input class="form-control form-control-sm" id="adminUserBranch-${user.userId}" value="${user.branchCode || ''}" placeholder="Chi nhánh"></td>
+                <td>
+                    <span class="badge ${user.active ? 'bg-success' : 'bg-secondary'}">${user.active ? 'ACTIVE' : 'DISABLED'}</span>
+                </td>
                 <td>${formatCurrency(user.walletBalance)}</td>
                 <td>${user.createdAt ? new Date(user.createdAt).toLocaleString('vi-VN') : 'N/A'}</td>
                 <td class="text-end">
-                    <button class="btn btn-primary btn-sm" onclick="saveUserAccess(${user.userId})" ${currentUser && currentUser.userId === user.userId ? 'disabled title="Không tự đổi quyền"' : ''}>Lưu</button>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button class="btn btn-primary" onclick="saveUserAccess(${user.userId})" ${currentUser && currentUser.userId === user.userId ? 'disabled title="Không tự đổi quyền"' : ''}>Lưu</button>
+                        <button class="btn ${user.active ? 'btn-outline-danger' : 'btn-outline-success'}" onclick="toggleUserActive(${user.userId}, ${user.active ? 'false' : 'true'})" ${currentUser && currentUser.userId === user.userId ? 'disabled title="Không tự khóa"' : ''} ${user.role === 'ROLE_ADMIN' ? 'disabled title="Không khóa Admin tổng"' : ''}>
+                            ${user.active ? 'Khóa' : 'Mở'}
+                        </button>
+                    </div>
                 </td>
             </tr>
         `).join('');
 
         adminUsersCache.forEach(user => toggleUserBranchInput(user.userId));
     } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-3">${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">${error.message}</td></tr>`;
+    }
+}
+
+function adminUsersApplySearch() {
+    adminUsersQuery.page = 0;
+    loadAdminUsers();
+}
+
+function adminUsersPrevPage() {
+    if (adminUsersQuery.page <= 0) {
+        return;
+    }
+    adminUsersQuery.page -= 1;
+    loadAdminUsers();
+}
+
+function adminUsersNextPage() {
+    if (adminUsersQuery.page + 1 >= adminUsersQuery.totalPages) {
+        return;
+    }
+    adminUsersQuery.page += 1;
+    loadAdminUsers();
+}
+
+async function toggleUserActive(userId, active) {
+    const target = adminUsersCache.find(item => item.userId === userId);
+    if (!target) return;
+
+    const label = active ? 'mở' : 'khóa';
+    if (!confirm(`Bạn có chắc muốn ${label} tài khoản ${target.email}?`)) {
+        return;
+    }
+
+    try {
+        await adminApiRequest(`/admin/users/${userId}/status`, {
+            method: 'PUT',
+            body: JSON.stringify({ active })
+        });
+        showToast('success', `Đã ${label} tài khoản ${target.email}.`);
+        await loadAdminUsers();
+        await loadAdminSummary();
+    } catch (error) {
+        showToast('danger', error.message);
     }
 }
 

@@ -7,9 +7,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.parking.smartparking.dto.request.AuthRequest;
+import com.parking.smartparking.dto.request.ForgotPasswordRequest;
 import com.parking.smartparking.dto.request.RegisterRequest;
+import com.parking.smartparking.dto.request.ResetPasswordRequest;
 import com.parking.smartparking.dto.response.AuthResponse;
+import com.parking.smartparking.dto.response.ForgotPasswordResponse;
+import com.parking.smartparking.dto.response.MessageResponse;
 import com.parking.smartparking.service.AuthService;
+import com.parking.smartparking.service.PasswordResetService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +39,7 @@ import lombok.RequiredArgsConstructor;
 public class AuthController {
 
     private final AuthService authService;
+    private final PasswordResetService passwordResetService;
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
@@ -45,5 +51,23 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody AuthRequest request) {
         AuthResponse response = authService.login(request);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ForgotPasswordResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        return ResponseEntity.ok(passwordResetService.createResetToken(request.getEmail()));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<MessageResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        passwordResetService.resetPassword(
+                request.getEmail(),
+                request.getToken(),
+                request.getNewPassword(),
+                request.getConfirmPassword());
+
+        return ResponseEntity.ok(MessageResponse.builder()
+                .message("Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.")
+                .build());
     }
 }

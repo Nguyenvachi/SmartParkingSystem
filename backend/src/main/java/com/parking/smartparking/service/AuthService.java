@@ -91,6 +91,10 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("Email hoặc mật khẩu không đúng"));
 
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw new RuntimeException("Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên.");
+        }
+
         // Bước 2: Kiểm tra mật khẩu
         // passwordEncoder.matches() sẽ:
         // - Lấy password từ request (plain text): "123456"

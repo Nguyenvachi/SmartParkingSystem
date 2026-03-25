@@ -20,6 +20,7 @@ public class AdminUserResponse {
     private String role;
     private String branchCode;
     private Boolean emailVerified;
+    private Boolean active;
     private BigDecimal walletBalance;
     private LocalDateTime membershipExpiry;
     private LocalDateTime createdAt;

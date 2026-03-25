@@ -59,6 +59,9 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         // Ensure user exists in DB (first-time login creates user)
         User user = userRepository.findByEmail(email)
                 .map(existing -> {
+                    if (!Boolean.TRUE.equals(existing.getIsActive())) {
+                        return existing;
+                    }
                     // Keep existing role, just refresh profile fields
                     if (name != null && !name.isBlank()) {
                         existing.setFullName(name);
@@ -80,6 +83,12 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                 .isEmailVerified(true)
                 .build());
 
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            log.warn("⛔ OAuth2 login bị chặn do user disabled | email={}", email);
+            response.sendRedirect(frontendBaseUrl + frontendLoginPath + "?error=disabled");
+            return;
+        }
+
         try {
             userRepository.save(Objects.requireNonNull(user));
         } catch (Exception ex) {
@@ -96,9 +105,9 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
         // Redirect with OAuth payload in URL fragment to avoid losing params on clean-URL rewrites.
         String redirectUrl = String.format(
-            "%s%s#oauth2=success&userId=%d&email=%s&fullName=%s&role=%s&branchCode=%s&avatarUrl=%s&token=%s",
+                "%s%s#oauth2=success&userId=%d&email=%s&fullName=%s&role=%s&branchCode=%s&avatarUrl=%s&token=%s",
                 frontendBaseUrl,
-            frontendLoginPath,
+                frontendLoginPath,
                 user.getId(),
                 URLEncoder.encode(email, StandardCharsets.UTF_8),
                 URLEncoder.encode(user.getFullName() != null ? user.getFullName() : "", StandardCharsets.UTF_8),
@@ -107,7 +116,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                 URLEncoder.encode(user.getAvatarUrl() != null ? user.getAvatarUrl() : "", StandardCharsets.UTF_8),
                 URLEncoder.encode(jwtToken, StandardCharsets.UTF_8));
 
-            log.debug("OAuth2 success routing | loginPath={} | dashboardPath={} (reserved)", frontendLoginPath, frontendDashboardPath);
+        log.debug("OAuth2 success routing | loginPath={} | dashboardPath={} (reserved)", frontendLoginPath, frontendDashboardPath);
         log.info("🚀 Redirect về: {}", redirectUrl);
         response.sendRedirect(redirectUrl);
     }

@@ -51,6 +51,46 @@ document.addEventListener('DOMContentLoaded', function () {
 // 1. XỬ LÝ ĐĂNG NHẬP
 // ============================================
 
+function setAuthMode(mode) {
+    const loginForm = document.getElementById('loginForm');
+    const forgotForm = document.getElementById('forgotPasswordForm');
+    const resetForm = document.getElementById('resetPasswordForm');
+
+    if (!loginForm || !forgotForm || !resetForm) {
+        return;
+    }
+
+    loginForm.classList.toggle('d-none', mode !== 'login');
+    forgotForm.classList.toggle('d-none', mode !== 'forgot');
+    resetForm.classList.toggle('d-none', mode !== 'reset');
+}
+
+document.getElementById('btnShowForgotPassword')?.addEventListener('click', function () {
+    const email = document.getElementById('floatingInput')?.value || '';
+    const forgotEmail = document.getElementById('forgotEmail');
+    if (forgotEmail && email) {
+        forgotEmail.value = email;
+    }
+    setAuthMode('forgot');
+});
+
+document.getElementById('btnBackToLoginFromForgot')?.addEventListener('click', function () {
+    setAuthMode('login');
+});
+
+document.getElementById('btnShowResetPassword')?.addEventListener('click', function () {
+    const forgotEmail = document.getElementById('forgotEmail')?.value || '';
+    const resetEmail = document.getElementById('resetEmail');
+    if (resetEmail && forgotEmail) {
+        resetEmail.value = forgotEmail;
+    }
+    setAuthMode('reset');
+});
+
+document.getElementById('btnBackToLoginFromReset')?.addEventListener('click', function () {
+    setAuthMode('login');
+});
+
 document.getElementById('loginForm')?.addEventListener('submit', async function (e) {
     e.preventDefault();
 
@@ -163,6 +203,97 @@ document.getElementById('registerForm')?.addEventListener('submit', async functi
 
         submitBtn.disabled = false;
         submitBtn.textContent = 'Đăng ký';
+    }
+});
+
+// ============================================
+// 2.1 QUÊN MẬT KHẨU / RESET MẬT KHẨU
+// ============================================
+
+document.getElementById('forgotPasswordForm')?.addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    const email = document.getElementById('forgotEmail')?.value || '';
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang gửi...';
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || 'Không thể tạo yêu cầu reset mật khẩu.');
+        }
+
+        showAlert('success', data.message || 'Đã tạo yêu cầu reset mật khẩu.');
+
+        // Demo/dev: nếu backend trả resetToken, tự chuyển qua form reset.
+        if (data.resetToken) {
+            const resetEmail = document.getElementById('resetEmail');
+            const resetToken = document.getElementById('resetToken');
+            if (resetEmail) resetEmail.value = email;
+            if (resetToken) resetToken.value = data.resetToken;
+            setAuthMode('reset');
+        }
+    } catch (error) {
+        console.error('❌ Lỗi forgot-password:', error);
+        showAlert('danger', error.message);
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Gửi yêu cầu reset';
+        }
+    }
+});
+
+document.getElementById('resetPasswordForm')?.addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    const email = document.getElementById('resetEmail')?.value || '';
+    const token = document.getElementById('resetToken')?.value || '';
+    const newPassword = document.getElementById('resetNewPassword')?.value || '';
+    const confirmPassword = document.getElementById('resetConfirmPassword')?.value || '';
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+
+    if (newPassword !== confirmPassword) {
+        showAlert('danger', 'Mật khẩu xác nhận không khớp.');
+        return;
+    }
+
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang đặt lại...';
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, token, newPassword, confirmPassword })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || 'Đặt lại mật khẩu thất bại.');
+        }
+
+        showAlert('success', data.message || 'Đặt lại mật khẩu thành công.');
+        setAuthMode('login');
+    } catch (error) {
+        console.error('❌ Lỗi reset-password:', error);
+        showAlert('danger', error.message);
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Đặt lại mật khẩu';
+        }
     }
 });
 
@@ -355,7 +486,9 @@ document.getElementById('btnLogout')?.addEventListener('click', function () {
 
 function showAlert(type, message) {
     // Tìm container để hiển thị alert
-    const alertContainer = document.querySelector('.form-signin') || document.querySelector('.container');
+    const alertContainer = document.querySelector('.auth-card .card-body')
+        || document.querySelector('.form-signin')
+        || document.querySelector('.container');
 
     if (!alertContainer) return;
 

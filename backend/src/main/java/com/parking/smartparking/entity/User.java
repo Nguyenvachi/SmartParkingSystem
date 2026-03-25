@@ -63,6 +63,10 @@ public class User {
     private Boolean isEmailVerified = false;
 
     @Builder.Default
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
+
+    @Builder.Default
     @Column(name = "wallet_balance", nullable = false, precision = 12, scale = 2)
     private BigDecimal walletBalance = BigDecimal.ZERO;
 

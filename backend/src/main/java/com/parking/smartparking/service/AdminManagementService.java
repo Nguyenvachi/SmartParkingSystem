@@ -3,12 +3,16 @@ package com.parking.smartparking.service;
 import java.util.List;
 import java.util.Locale;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.parking.smartparking.dto.request.AdminUserUpdateRequest;
 import com.parking.smartparking.dto.response.AdminDashboardSummaryResponse;
 import com.parking.smartparking.dto.response.AdminUserResponse;
+import com.parking.smartparking.dto.response.PagedResponse;
 import com.parking.smartparking.entity.BlacklistedVehicle;
 import com.parking.smartparking.entity.ParkingSlot;
 import com.parking.smartparking.entity.User;
@@ -70,6 +74,43 @@ public class AdminManagementService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public PagedResponse<AdminUserResponse> searchManagedUsers(
+            String requesterEmail,
+            String keyword,
+            int page,
+            int size,
+            String sortBy,
+            String sortDir) {
+
+        User requester = findRequester(requesterEmail);
+        ensureGlobalAdmin(requester);
+
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(100, Math.max(1, size));
+
+        String safeSortBy = (sortBy == null || sortBy.isBlank()) ? "createdAt" : sortBy;
+        Sort.Direction direction = "asc".equalsIgnoreCase(sortDir) ? Sort.Direction.ASC : Sort.Direction.DESC;
+
+        PageRequest pageable = PageRequest.of(safePage, safeSize, Sort.by(direction, safeSortBy));
+
+        Page<User> result;
+        String q = keyword == null ? "" : keyword.trim();
+        if (q.isBlank()) {
+            result = userRepository.findAll(pageable);
+        } else {
+            result = userRepository.findByEmailContainingIgnoreCaseOrFullNameContainingIgnoreCase(q, q, pageable);
+        }
+
+        return PagedResponse.<AdminUserResponse>builder()
+                .items(result.getContent().stream().map(this::toResponse).toList())
+                .page(result.getNumber())
+                .size(result.getSize())
+                .totalItems(result.getTotalElements())
+                .totalPages(result.getTotalPages())
+                .build();
+    }
+
     @Transactional
     public AdminUserResponse updateUserAccess(Long userId, AdminUserUpdateRequest request, String requesterEmail) {
         User requester = findRequester(requesterEmail);
@@ -103,6 +144,26 @@ public class AdminManagementService {
         return toResponse(userRepository.save(targetUser));
     }
 
+    @Transactional
+    public AdminUserResponse updateUserStatus(Long userId, boolean active, String requesterEmail) {
+        User requester = findRequester(requesterEmail);
+        ensureGlobalAdmin(requester);
+
+        if (requester.getId().equals(userId)) {
+            throw new RuntimeException("Admin tổng không được tự khóa/mở tài khoản của chính mình.");
+        }
+
+        User targetUser = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user #" + userId));
+
+        if (!active && targetUser.isGlobalAdmin()) {
+            throw new RuntimeException("Không được vô hiệu hóa tài khoản Admin tổng.");
+        }
+
+        targetUser.setIsActive(active);
+        return toResponse(userRepository.save(targetUser));
+    }
+
     private long countByStatus(List<ParkingSlot> slots, String status) {
         return slots.stream().filter(slot -> status.equalsIgnoreCase(slot.getStatus())).count();
     }
@@ -133,10 +194,10 @@ public class AdminManagementService {
                 .role(user.getRole().name())
                 .branchCode(user.getBranchCode())
                 .emailVerified(user.getIsEmailVerified())
+                .active(user.getIsActive())
                 .walletBalance(user.getWalletBalance())
                 .membershipExpiry(user.getMembershipExpiry())
                 .createdAt(user.getCreatedAt())
                 .build();
     }
 }
-

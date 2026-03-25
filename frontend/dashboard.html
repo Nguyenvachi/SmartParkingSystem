@@ -12,6 +12,9 @@
         rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0d6efd">
     <link rel="stylesheet" href="css/style.css">
 </head>
 
@@ -443,6 +446,25 @@
                             <div class="fw-semibold">Quản lý user và phân quyền</div>
                             <button class="btn btn-outline-secondary btn-sm" onclick="loadAdminUsers()">Tải lại</button>
                         </div>
+                        <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                            <input class="form-control form-control-sm" style="max-width: 260px;" id="adminUserSearchInput" placeholder="Tìm theo tên hoặc email">
+                            <select class="form-select form-select-sm" style="max-width: 160px;" id="adminUserSortBy">
+                                <option value="createdAt" selected>Mới nhất</option>
+                                <option value="fullName">Họ tên</option>
+                                <option value="email">Email</option>
+                                <option value="role">Role</option>
+                            </select>
+                            <select class="form-select form-select-sm" style="max-width: 140px;" id="adminUserSortDir">
+                                <option value="desc" selected>Giảm dần</option>
+                                <option value="asc">Tăng dần</option>
+                            </select>
+                            <button class="btn btn-primary btn-sm" onclick="adminUsersApplySearch()">Tìm</button>
+                            <div class="ms-auto d-flex align-items-center gap-2">
+                                <button class="btn btn-outline-secondary btn-sm" onclick="adminUsersPrevPage()">Trước</button>
+                                <span class="small text-muted" id="adminUserPageInfo">Trang 1/1</span>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="adminUsersNextPage()">Sau</button>
+                            </div>
+                        </div>
                         <div class="table-responsive border rounded">
                             <table class="table table-sm align-middle mb-0">
                                 <thead class="table-light">
@@ -451,6 +473,7 @@
                                         <th>Email</th>
                                         <th>Role</th>
                                         <th>Chi nhánh</th>
+                                        <th>Trạng thái</th>
                                         <th>Ví</th>
                                         <th>Tạo lúc</th>
                                         <th class="text-end">Lưu</th>
@@ -458,7 +481,7 @@
                                 </thead>
                                 <tbody id="adminUsersTableBody">
                                     <tr>
-                                        <td colspan="7" class="text-center text-muted py-3">Đang tải user...</td>
+                                        <td colspan="8" class="text-center text-muted py-3">Đang tải user...</td>
                                     </tr>
                                 </tbody>
                             </table>

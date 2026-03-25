@@ -70,4 +70,26 @@ class JwtAuthFilterTests {
 
         assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
+
+    @Test
+    void shouldRejectDisabledUserToken() throws Exception {
+        JwtAuthFilter filter = new JwtAuthFilter(jwtService, userRepository);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRequestURI("/api/admin/summary");
+        request.addHeader("Authorization", "Bearer valid-token");
+
+        when(jwtService.isTokenValid("valid-token")).thenReturn(true);
+        when(jwtService.extractEmail("valid-token")).thenReturn("disabled@test.com");
+        when(userRepository.findByEmail("disabled@test.com")).thenReturn(Optional.of(User.builder()
+                .email("disabled@test.com")
+                .role(User.Role.ROLE_USER)
+                .isActive(false)
+                .build()));
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertEquals(403, response.getStatus());
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
 }
