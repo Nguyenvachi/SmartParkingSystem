@@ -55,8 +55,8 @@ class BookingServiceTests {
     @Mock
     private VoucherService voucherService;
 
-        @Mock
-        private BlacklistService blacklistService;
+    @Mock
+    private BlacklistService blacklistService;
 
     @Test
     void shouldRejectBookingWhenOptimisticLockConflictOccurs() {
@@ -66,6 +66,7 @@ class BookingServiceTests {
                 .email("race@test.com")
                 .fullName("Race Test")
                 .password("secret")
+                .walletBalance(new BigDecimal("5000"))
                 .build();
 
         ParkingSlot slot = ParkingSlot.builder()
@@ -81,6 +82,11 @@ class BookingServiceTests {
         request.setSlotId(5L);
 
         when(userRepository.findByEmail("race@test.com")).thenReturn(Optional.of(user));
+        when(bookingRepository.existsByUser_EmailAndStatusIn(
+                eq("race@test.com"),
+                eq(List.of(com.parking.smartparking.entity.Booking.BookingStatus.PENDING,
+                        com.parking.smartparking.entity.Booking.BookingStatus.CHECKED_IN))))
+                .thenReturn(false);
         when(parkingSlotRepository.findById(5L)).thenReturn(Optional.of(slot));
         when(bookingRepository.existsByUser_EmailAndParkingSlot_IdAndStatusIn(
                 eq("race@test.com"),
@@ -95,6 +101,102 @@ class BookingServiceTests {
                 () -> bookingService.createBooking("race@test.com", request));
 
         assertEquals("Slot A01 vừa được người khác đặt mất! Vui lòng chọn slot khác.", exception.getMessage());
+        verify(webSocketController, never()).sendSlotUpdate(any());
+    }
+
+    @Test
+    void shouldRejectBookingWhenUserIsAdmin() {
+        BookingService bookingService = createService();
+        User admin = User.builder()
+                .id(99L)
+                .email("admin@test.com")
+                .fullName("Admin")
+                .password("secret")
+                .role(User.Role.ROLE_ADMIN)
+                .walletBalance(new BigDecimal("999999"))
+                .build();
+
+        BookingRequest request = new BookingRequest();
+        request.setSlotId(1L);
+
+        when(userRepository.findByEmail("admin@test.com")).thenReturn(Optional.of(admin));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> bookingService.createBooking("admin@test.com", request));
+
+        assertEquals("Tài khoản ADMIN không được phép đặt chỗ.", exception.getMessage());
+        verify(parkingSlotRepository, never()).findById(any());
+        verify(parkingSlotRepository, never()).saveAndFlush(any());
+        verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectBookingWhenUserAlreadyHasActiveBooking() {
+        BookingService bookingService = createService();
+        User user = User.builder()
+                .id(1L)
+                .email("user@test.com")
+                .fullName("User")
+                .password("secret")
+                .walletBalance(new BigDecimal("5000"))
+                .build();
+
+        BookingRequest request = new BookingRequest();
+        request.setSlotId(1L);
+
+        when(userRepository.findByEmail("user@test.com")).thenReturn(Optional.of(user));
+        when(bookingRepository.existsByUser_EmailAndStatusIn(
+                eq("user@test.com"),
+                eq(List.of(com.parking.smartparking.entity.Booking.BookingStatus.PENDING,
+                        com.parking.smartparking.entity.Booking.BookingStatus.CHECKED_IN))))
+                .thenReturn(true);
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> bookingService.createBooking("user@test.com", request));
+
+        assertEquals("Bạn đang có 1 booking đang hoạt động. Vui lòng hoàn tất hoặc hủy trước khi đặt mới.",
+                exception.getMessage());
+        verify(parkingSlotRepository, never()).findById(any());
+        verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectBookingWhenWalletBalanceIsInsufficient() {
+        BookingService bookingService = createService();
+        User user = User.builder()
+                .id(1L)
+                .email("poor@test.com")
+                .fullName("Poor User")
+                .password("secret")
+                .walletBalance(new BigDecimal("1000"))
+                .build();
+
+        ParkingSlot slot = ParkingSlot.builder()
+                .id(7L)
+                .slotName("C03")
+                .type("SEDAN")
+                .status("AVAILABLE")
+                .pricePerHour(new BigDecimal("5000"))
+                .version(1L)
+                .build();
+
+        BookingRequest request = new BookingRequest();
+        request.setSlotId(7L);
+
+        when(userRepository.findByEmail("poor@test.com")).thenReturn(Optional.of(user));
+        when(bookingRepository.existsByUser_EmailAndStatusIn(
+                eq("poor@test.com"),
+                eq(List.of(com.parking.smartparking.entity.Booking.BookingStatus.PENDING,
+                        com.parking.smartparking.entity.Booking.BookingStatus.CHECKED_IN))))
+                .thenReturn(false);
+        when(parkingSlotRepository.findById(7L)).thenReturn(Optional.of(slot));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> bookingService.createBooking("poor@test.com", request));
+
+        assertEquals("Số dư ví không đủ để đặt slot này. Vui lòng nạp thêm tiền.", exception.getMessage());
+        verify(parkingSlotRepository, never()).saveAndFlush(any());
+        verify(bookingRepository, never()).save(any());
         verify(webSocketController, never()).sendSlotUpdate(any());
     }
 
@@ -187,7 +289,7 @@ class BookingServiceTests {
                 webSocketController,
                 pricingService,
                 walletService,
-                                voucherService,
-                                blacklistService);
+                voucherService,
+                blacklistService);
     }
 }

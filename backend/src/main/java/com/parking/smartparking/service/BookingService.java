@@ -80,10 +80,29 @@ public class BookingService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy user: " + userEmail));
 
+        // Rule (Phase 1): Chặn tài khoản ROLE_ADMIN đặt slot
+        if (user.getRole() == User.Role.ROLE_ADMIN) {
+            throw new RuntimeException("Tài khoản ADMIN không được phép đặt chỗ.");
+        }
+
+        // Rule (Phase 1): 1 User chỉ được có tối đa 1 booking đang active
+        boolean hasAnyActiveBooking = bookingRepository.existsByUser_EmailAndStatusIn(
+                userEmail,
+                List.of(Booking.BookingStatus.PENDING, Booking.BookingStatus.CHECKED_IN));
+        if (hasAnyActiveBooking) {
+            throw new RuntimeException("Bạn đang có 1 booking đang hoạt động. Vui lòng hoàn tất hoặc hủy trước khi đặt mới.");
+        }
+
         // Bước 2: Tìm slot
         Long requiredSlotId = Objects.requireNonNull(request.getSlotId(), "slotId không được null");
         ParkingSlot slot = parkingSlotRepository.findById(requiredSlotId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy slot với ID: " + request.getSlotId()));
+
+        // Rule (Phase 1): Số dư ví phải >= giá của slot thì mới cho phép tạo booking
+        BigDecimal slotPrice = slot.getPricePerHour() != null ? slot.getPricePerHour() : BigDecimal.ZERO;
+        if (slotPrice.signum() > 0 && user.getWalletBalance().compareTo(slotPrice) < 0) {
+            throw new RuntimeException("Số dư ví không đủ để đặt slot này. Vui lòng nạp thêm tiền.");
+        }
 
         // Bước 3: Kiểm tra trạng thái slot
         if (!"AVAILABLE".equals(slot.getStatus())) {

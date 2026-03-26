@@ -1,12 +1,13 @@
 package com.parking.smartparking.repository;
 
-import com.parking.smartparking.entity.Booking;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import com.parking.smartparking.entity.Booking;
 
 /**
  * Repository cho Entity Booking
@@ -62,4 +63,11 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
      */
     boolean existsByUser_EmailAndParkingSlot_IdAndStatusIn(
             String email, Long slotId, List<Booking.BookingStatus> statuses);
+
+    /**
+     * Kiểm tra user có đang có booking active (PENDING hoặc CHECKED_IN) không.
+     *
+     * Rule mới (Phase 1): 1 user chỉ được có tối đa 1 booking đang active.
+     */
+    boolean existsByUser_EmailAndStatusIn(String email, List<Booking.BookingStatus> statuses);
 }

@@ -9,6 +9,10 @@ Prerequisites: Docker Desktop.
 docker compose up --build
 ```
 
+## Deploy on VPS
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for a copy-paste VPS + DNS + `.env` checklist.
+
 - Frontend: http://localhost:3000 (clean URLs: `/login`, `/dashboard`)
 - Backend API: http://localhost:8080/api
 - MySQL: localhost:3306 (db: `smartparking_db`, user: `root`, pass: `root`)
