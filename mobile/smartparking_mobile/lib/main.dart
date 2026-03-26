@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'core/config/app_theme.dart';
 import 'core/storage/token_storage.dart';
 import 'features/auth/ui/login_page.dart';
 import 'features/booking/ui/booking_page.dart';
@@ -17,7 +18,7 @@ class SmartParkingApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'SmartParking',
-      theme: ThemeData(useMaterial3: true),
+      theme: AppTheme.theme,
       home: const RootRouter(),
     );
   }
@@ -85,7 +86,43 @@ class _RootRouterState extends State<RootRouter> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('SmartParking'),
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              margin: const EdgeInsets.only(right: 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppTheme.brandAccent, Color(0xFF0B8C82)],
+                ),
+              ),
+              child: const Icon(Icons.local_parking, color: Colors.white),
+            ),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Smart Parking'),
+                  SizedBox(height: 2),
+                  Text(
+                    'Hệ thống quản lý & đặt chỗ',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xB3FFFFFF),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(onPressed: _logout, icon: const Icon(Icons.logout)),
         ],
