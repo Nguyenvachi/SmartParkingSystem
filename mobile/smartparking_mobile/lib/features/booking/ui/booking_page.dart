@@ -217,34 +217,36 @@ class _BookingPageState extends State<BookingPage> {
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
-            child: ListView.separated(
+            child: ListView.builder(
               padding: const EdgeInsets.all(12),
               itemCount: _bookings.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final b = _bookings[index];
-                return ListTile(
-                  title: Text('Booking #${b.bookingId} | ${b.slotName}'),
-                  subtitle: Text(
-                    'Status: ${b.status}${b.vehiclePlate != null ? ' | Plate: ${b.vehiclePlate}' : ''}',
-                  ),
-                  trailing: Wrap(
-                    spacing: 8,
-                    children: [
-                      IconButton(
-                        onPressed: (b.qrCodeBase64 != null &&
-                                b.qrCodeBase64!.isNotEmpty)
-                            ? () => _openQr(b)
-                            : null,
-                        icon: const Icon(Icons.qr_code),
-                      ),
-                      IconButton(
-                        onPressed: b.status == 'PENDING'
-                            ? () => _checkIn(b.bookingId)
-                            : null,
-                        icon: const Icon(Icons.login),
-                      ),
-                    ],
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: ListTile(
+                    title: Text('Booking #${b.bookingId} | ${b.slotName}'),
+                    subtitle: Text(
+                      'Status: ${b.status}${b.vehiclePlate != null ? ' | Plate: ${b.vehiclePlate}' : ''}',
+                    ),
+                    trailing: Wrap(
+                      spacing: 8,
+                      children: [
+                        IconButton(
+                          onPressed: (b.qrCodeBase64 != null &&
+                                  b.qrCodeBase64!.isNotEmpty)
+                              ? () => _openQr(b)
+                              : null,
+                          icon: const Icon(Icons.qr_code),
+                        ),
+                        IconButton(
+                          onPressed: b.status == 'PENDING'
+                              ? () => _checkIn(b.bookingId)
+                              : null,
+                          icon: const Icon(Icons.login),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
