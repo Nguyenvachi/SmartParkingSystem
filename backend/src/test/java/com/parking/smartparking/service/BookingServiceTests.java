@@ -56,6 +56,9 @@ class BookingServiceTests {
     private VoucherService voucherService;
 
     @Mock
+    private InvoiceService invoiceService;
+
+    @Mock
     private BlacklistService blacklistService;
 
     @Test
@@ -290,6 +293,7 @@ class BookingServiceTests {
                 pricingService,
                 walletService,
                 voucherService,
+                invoiceService,
                 blacklistService);
     }
 }

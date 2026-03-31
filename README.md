@@ -37,3 +37,19 @@ docker compose up -d --force-recreate backend
 
 - Password reset demo mode is enabled by default in compose via `APP_PASSWORD_RESET_EXPOSE_TOKEN=true`.
 - To disable demo token exposure when deploying: set `APP_PASSWORD_RESET_EXPOSE_TOKEN=false`.
+
+## Gate / barrier flow (Guard-controlled)
+
+- User (mobile/web) chỉ đặt chỗ và xuất trình QR.
+- Check-in và Check-out chỉ thực hiện tại cổng (bảo vệ) qua `scanner.html`.
+- Backend đã chặn user thường gọi API `POST /api/bookings/{id}/checkin|checkout` (chỉ `ROLE_ADMIN`/`ROLE_BRANCH_ADMIN`).
+
+## End-to-end test script
+
+1) Start stack: `docker compose up --build`
+2) Login user (ROLE_USER) trên web hoặc mobile
+3) Create booking (status `PENDING`) và mở QR
+4) Login staff (ROLE_ADMIN / ROLE_BRANCH_ADMIN) trên web
+5) Open `http://localhost:3000/scanner.html`
+6) Mode `Check-in` → scan QR → booking chuyển `CHECKED_IN`, slot `OCCUPIED`
+7) Mode `Check-out` → scan lại QR → booking chuyển `COMPLETED`, slot `AVAILABLE` (ví bị trừ nếu có phí)

@@ -116,18 +116,6 @@ class _BookingPageState extends State<BookingPage> {
     }
   }
 
-  Future<void> _checkIn(int bookingId) async {
-    try {
-      final data = await _api.post('/bookings/$bookingId/checkin', body: {});
-      _toast(data['message']?.toString() ?? 'Check-in thành công');
-      await _load();
-    } on ApiException catch (e) {
-      _toast(e.message);
-    } catch (_) {
-      _toast('Check-in thất bại.');
-    }
-  }
-
   String _normalizeBase64(String raw) {
     final trimmed = raw.trim();
     final comma = trimmed.indexOf(',');
@@ -238,12 +226,6 @@ class _BookingPageState extends State<BookingPage> {
                               ? () => _openQr(b)
                               : null,
                           icon: const Icon(Icons.qr_code),
-                        ),
-                        IconButton(
-                          onPressed: b.status == 'PENDING'
-                              ? () => _checkIn(b.bookingId)
-                              : null,
-                          icon: const Icon(Icons.login),
                         ),
                       ],
                     ),

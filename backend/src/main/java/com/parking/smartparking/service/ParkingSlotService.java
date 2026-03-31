@@ -1,9 +1,12 @@
 package com.parking.smartparking.service;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -14,7 +17,9 @@ import com.parking.smartparking.dto.request.ParkingSlotRequest;
 import com.parking.smartparking.dto.response.ParkingRecommendationResponse;
 import com.parking.smartparking.dto.response.ParkingSlotResponse;
 import com.parking.smartparking.entity.ParkingSlot;
+import com.parking.smartparking.entity.Booking;
 import com.parking.smartparking.entity.User;
+import com.parking.smartparking.repository.BookingRepository;
 import com.parking.smartparking.repository.ParkingSlotRepository;
 import com.parking.smartparking.repository.UserRepository;
 
@@ -37,6 +42,7 @@ public class ParkingSlotService {
     private static final int ELEVATOR_WEIGHT = 3;
     private static final String DEFAULT_BRANCH = "MAIN";
     private final ParkingSlotRepository parkingSlotRepository;
+    private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     // [FIX 3 - Tech #5 WebSocket] Inject để gửi real-time update khi slot thay đổi
     private final WebSocketController webSocketController;
@@ -52,8 +58,10 @@ public class ParkingSlotService {
                 ? parkingSlotRepository.findAllVisibleByBranchCode(branchAccess.branchCode())
                 : parkingSlotRepository.findAll();
 
+        Map<Long, Booking> activeBookings = resolveActiveBookingsBySlotId(slots);
+
         return slots.stream()
-                .map(this::convertToResponse)
+                .map(slot -> convertToResponse(slot, activeBookings.get(slot.getId())))
                 .collect(Collectors.toList());
     }
 
@@ -69,8 +77,10 @@ public class ParkingSlotService {
                 ? parkingSlotRepository.findByStatusVisibleByBranchCode(status, branchAccess.branchCode())
                 : parkingSlotRepository.findByStatus(status);
 
+        Map<Long, Booking> activeBookings = resolveActiveBookingsBySlotId(slots);
+
         return slots.stream()
-                .map(this::convertToResponse)
+                .map(slot -> convertToResponse(slot, activeBookings.get(slot.getId())))
                 .collect(Collectors.toList());
     }
 
@@ -133,7 +143,9 @@ public class ParkingSlotService {
                 ? parkingSlotRepository.findByIdVisibleByBranchCode(requiredId, branchAccess.branchCode())
                 : parkingSlotRepository.findById(requiredId))
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy slot với ID: " + id));
-        return convertToResponse(slot);
+        Booking active = bookingRepository.findFirstByParkingSlot_IdAndStatusOrderByCheckInTimeDesc(slot.getId(), Booking.BookingStatus.CHECKED_IN)
+                .orElse(null);
+        return convertToResponse(slot, active);
     }
 
     /**
@@ -242,6 +254,11 @@ public class ParkingSlotService {
      * Hàm helper: Convert Entity sang DTO Response
      */
     private ParkingSlotResponse convertToResponse(ParkingSlot slot) {
+        return convertToResponse(slot, null);
+    }
+
+    private ParkingSlotResponse convertToResponse(ParkingSlot slot, Booking activeBooking) {
+        Booking active = ("OCCUPIED".equalsIgnoreCase(slot.getStatus())) ? activeBooking : null;
         return ParkingSlotResponse.builder()
                 .id(slot.getId())
                 .slotName(slot.getSlotName())
@@ -249,8 +266,51 @@ public class ParkingSlotService {
                 .status(slot.getStatus())
                 .pricePerHour(slot.getPricePerHour())
                 .branchCode(normalizeBranchCode(slot.getBranchCode()))
+                .activeBookingId(active != null ? active.getId() : null)
+                .activeVehiclePlate(active != null ? active.getVehiclePlate() : null)
+                .activeCheckInTime(active != null ? active.getCheckInTime() : null)
                 .version(slot.getVersion())
                 .build();
+    }
+
+    private Map<Long, Booking> resolveActiveBookingsBySlotId(List<ParkingSlot> slots) {
+        if (slots == null || slots.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> slotIds = slots.stream()
+                .map(ParkingSlot::getId)
+                .filter(Objects::nonNull)
+                .toList();
+
+        if (slotIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Booking> actives = bookingRepository.findByParkingSlot_IdInAndStatus(slotIds, Booking.BookingStatus.CHECKED_IN);
+        if (actives == null || actives.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, Booking> result = new HashMap<>();
+        for (Booking booking : actives) {
+            if (booking == null || booking.getParkingSlot() == null || booking.getParkingSlot().getId() == null) {
+                continue;
+            }
+            Long slotId = booking.getParkingSlot().getId();
+            Booking existing = result.get(slotId);
+            if (existing == null) {
+                result.put(slotId, booking);
+                continue;
+            }
+            LocalDateTime a = booking.getCheckInTime();
+            LocalDateTime b = existing.getCheckInTime();
+            if (b == null || (a != null && a.isAfter(b))) {
+                result.put(slotId, booking);
+            }
+        }
+        return result;
+
     }
 
     private BranchAccess resolveBranchAccess(String requesterEmail) {

@@ -1,5 +1,8 @@
 package com.parking.smartparking.service;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 
@@ -14,9 +17,11 @@ import com.parking.smartparking.dto.response.AdminDashboardSummaryResponse;
 import com.parking.smartparking.dto.response.AdminUserResponse;
 import com.parking.smartparking.dto.response.PagedResponse;
 import com.parking.smartparking.entity.BlacklistedVehicle;
+import com.parking.smartparking.entity.Booking;
 import com.parking.smartparking.entity.ParkingSlot;
 import com.parking.smartparking.entity.User;
 import com.parking.smartparking.repository.BlacklistedVehicleRepository;
+import com.parking.smartparking.repository.BookingRepository;
 import com.parking.smartparking.repository.ParkingSlotRepository;
 import com.parking.smartparking.repository.UserRepository;
 
@@ -32,23 +37,52 @@ public class AdminManagementService {
     private final UserRepository userRepository;
     private final ParkingSlotRepository parkingSlotRepository;
     private final BlacklistedVehicleRepository blacklistedVehicleRepository;
+    private final BookingRepository bookingRepository;
 
     @Transactional(readOnly = true)
     public AdminDashboardSummaryResponse getSummary(String requesterEmail) {
         User requester = findRequester(requesterEmail);
+
+        boolean branchRestricted = requester.isBranchAdmin();
+        String branchCode = normalizeBranchCode(requester.getBranchCode());
+
         List<ParkingSlot> visibleSlots = requester.isBranchAdmin()
-                ? parkingSlotRepository.findAllVisibleByBranchCode(normalizeBranchCode(requester.getBranchCode()))
+                ? parkingSlotRepository.findAllVisibleByBranchCode(branchCode)
                 : parkingSlotRepository.findAll();
 
         List<User> visibleUsers = requester.isBranchAdmin()
-                ? userRepository.findByBranchCodeOrderByRoleAscFullNameAscEmailAsc(normalizeBranchCode(requester.getBranchCode()))
+                ? userRepository.findByBranchCodeOrderByRoleAscFullNameAscEmailAsc(branchCode)
                 : userRepository.findAllManagedUsers();
 
         long activeBlacklistEntries = (requester.isBranchAdmin()
-                ? blacklistedVehicleRepository.findVisibleByBranchCode(normalizeBranchCode(requester.getBranchCode()))
+                ? blacklistedVehicleRepository.findVisibleByBranchCode(branchCode)
                 : blacklistedVehicleRepository.findAll()).stream()
                 .filter(BlacklistedVehicle::getActive)
                 .count();
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
+        LocalDateTime startOfMonth = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+
+        BigDecimal revenueToday = branchRestricted
+                ? bookingRepository.sumTotalAmountByStatusAndCheckOutTimeBetweenForBranch(Booking.BookingStatus.COMPLETED, branchCode, startOfToday, now)
+                : bookingRepository.sumTotalAmountByStatusAndCheckOutTimeBetween(Booking.BookingStatus.COMPLETED, startOfToday, now);
+
+        BigDecimal revenueThisMonth = branchRestricted
+                ? bookingRepository.sumTotalAmountByStatusAndCheckOutTimeBetweenForBranch(Booking.BookingStatus.COMPLETED, branchCode, startOfMonth, now)
+                : bookingRepository.sumTotalAmountByStatusAndCheckOutTimeBetween(Booking.BookingStatus.COMPLETED, startOfMonth, now);
+
+        BigDecimal revenueAllTime = branchRestricted
+                ? bookingRepository.sumTotalAmountByStatusForBranch(Booking.BookingStatus.COMPLETED, branchCode)
+                : bookingRepository.sumTotalAmountByStatus(Booking.BookingStatus.COMPLETED);
+
+        long completedToday = branchRestricted
+                ? bookingRepository.countByStatusAndCheckOutTimeBetweenForBranch(Booking.BookingStatus.COMPLETED, branchCode, startOfToday, now)
+                : bookingRepository.countByStatusAndCheckOutTimeBetween(Booking.BookingStatus.COMPLETED, startOfToday, now);
+
+        long completedThisMonth = branchRestricted
+                ? bookingRepository.countByStatusAndCheckOutTimeBetweenForBranch(Booking.BookingStatus.COMPLETED, branchCode, startOfMonth, now)
+                : bookingRepository.countByStatusAndCheckOutTimeBetween(Booking.BookingStatus.COMPLETED, startOfMonth, now);
 
         return AdminDashboardSummaryResponse.builder()
                 .role(requester.getRole().name())
@@ -61,6 +95,11 @@ public class AdminManagementService {
                 .occupiedSlots(countByStatus(visibleSlots, "OCCUPIED"))
                 .maintenanceSlots(countByStatus(visibleSlots, "MAINTENANCE"))
                 .activeBlacklistEntries(activeBlacklistEntries)
+                .revenueToday(revenueToday)
+                .revenueThisMonth(revenueThisMonth)
+                .revenueAllTime(revenueAllTime)
+                .completedBookingsToday(completedToday)
+                .completedBookingsThisMonth(completedThisMonth)
                 .build();
     }
 

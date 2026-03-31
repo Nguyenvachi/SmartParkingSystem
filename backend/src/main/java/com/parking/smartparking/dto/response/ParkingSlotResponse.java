@@ -1,6 +1,7 @@
 package com.parking.smartparking.dto.response;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,6 +26,11 @@ public class ParkingSlotResponse {
     private String status;
     private BigDecimal pricePerHour;
     private String branchCode;
+
+    // When slot is OCCUPIED, backend will attach the currently active booking info (if available)
+    private Long activeBookingId;
+    private String activeVehiclePlate;
+    private LocalDateTime activeCheckInTime;
 
     /**
      * Version field cho frontend (để hiển thị trạng thái cập nhật) KHÔNG dùng

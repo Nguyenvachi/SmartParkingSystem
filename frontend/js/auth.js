@@ -6,6 +6,16 @@
 // Nếu đã đăng nhập (token còn hạn) thì không ở lại trang login/register.
 document.addEventListener('DOMContentLoaded', function () {
     try {
+        const params = new URLSearchParams(window.location.search || '');
+        // Useful for role testing: keep auth page even if a previous token is still valid.
+        if (params.get('logout') === '1') {
+            localStorage.removeItem('user');
+            return;
+        }
+        if (params.get('force') === '1') {
+            return;
+        }
+
         const path = (window.location.pathname || '').toLowerCase();
         const isAuthPage = path.endsWith('/login') || path.endsWith('/login.html')
             || path.endsWith('/register') || path.endsWith('/register.html');

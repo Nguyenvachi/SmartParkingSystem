@@ -105,7 +105,8 @@ public class BookingController {
             @PathVariable Long id,
             Authentication authentication) {
         String email = authentication.getName();
-        BookingResponse response = bookingService.checkIn(id, email);
+        // Staff-only gate operation (barrier/guard). Authorization is enforced in SecurityConfig.
+        BookingResponse response = bookingService.checkInAsStaff(id, email);
         return ResponseEntity.ok(response);
     }
 
@@ -118,7 +119,8 @@ public class BookingController {
             @RequestBody(required = false) CheckoutRequest request,
             Authentication authentication) {
         String email = authentication.getName();
-        BookingResponse response = bookingService.checkOut(id, email, request);
+        // Staff-only gate operation (barrier/guard). Authorization is enforced in SecurityConfig.
+        BookingResponse response = bookingService.checkOutAsStaff(id, email, request);
         return ResponseEntity.ok(response);
     }
 

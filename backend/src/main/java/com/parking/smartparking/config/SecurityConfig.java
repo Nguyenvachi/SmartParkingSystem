@@ -63,6 +63,16 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // Payment gateway callbacks (no JWT)
                 .requestMatchers("/api/payments/callback/**").permitAll()
+                // Gate/Guard operations must be staff-only
+                .requestMatchers(HttpMethod.POST, "/api/bookings/*/checkin").hasAnyAuthority("ROLE_ADMIN", "ROLE_BRANCH_ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/bookings/*/checkout").hasAnyAuthority("ROLE_ADMIN", "ROLE_BRANCH_ADMIN")
+                // User-only modules: booking creation/history/cancel + wallet operations
+                .requestMatchers(HttpMethod.POST, "/api/bookings").hasAuthority("ROLE_USER")
+                .requestMatchers(HttpMethod.GET, "/api/bookings").hasAuthority("ROLE_USER")
+                .requestMatchers(HttpMethod.DELETE, "/api/bookings/*").hasAuthority("ROLE_USER")
+                // Allow both user & staff to fetch a specific booking (scanner validation)
+                .requestMatchers(HttpMethod.GET, "/api/bookings/*").hasAnyAuthority("ROLE_USER", "ROLE_ADMIN", "ROLE_BRANCH_ADMIN")
+                .requestMatchers("/api/wallet/**").hasAuthority("ROLE_USER")
                 .requestMatchers(HttpMethod.GET, "/api/audit-logs/**").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/admin/summary").hasAnyAuthority("ROLE_ADMIN", "ROLE_BRANCH_ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/admin/users/**").hasAuthority("ROLE_ADMIN")
@@ -88,6 +98,8 @@ public class SecurityConfig {
                         "/register.html",
                         "/dashboard",
                         "/dashboard.html",
+                        "/scanner",
+                        "/scanner.html",
                         "/css/**",
                         "/js/**",
                         "/assets/**",

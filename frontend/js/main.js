@@ -18,6 +18,45 @@ let stompClient = null; // STOMP client instance
 let slotsData = {}; // Lưu trữ dữ liệu slots (key: slotName, value: slotObject)
 let unauthorizedRedirectScheduled = false;
 
+let dashboardIsAdmin = false;
+
+function isAdminRole(role) {
+    return role === 'ROLE_ADMIN' || role === 'ROLE_BRANCH_ADMIN';
+}
+
+function resolveDashboardRole() {
+    const user = (typeof getStoredUser === 'function')
+        ? getStoredUser()
+        : JSON.parse(localStorage.getItem('user') || 'null');
+    return user?.role || 'ROLE_USER';
+}
+
+function applyRoleBasedDashboardUI() {
+    const role = resolveDashboardRole();
+    dashboardIsAdmin = isAdminRole(role);
+
+    // Hide user-only modules for admin roles
+    document.querySelectorAll('.user-only').forEach(el => {
+        if (dashboardIsAdmin) {
+            el.classList.add('d-none');
+        } else {
+            el.classList.remove('d-none');
+        }
+    });
+
+    // Prevent switching to hidden tabs (navbar links call switchSidebarTab)
+    if (dashboardIsAdmin) {
+        try {
+            const guideTrigger = document.querySelector('[data-bs-target="#tabGuide"]');
+            if (guideTrigger) {
+                bootstrap.Tab.getOrCreateInstance(guideTrigger).show();
+            }
+        } catch (_) {
+            // no-op
+        }
+    }
+}
+
 // Phase 4: Selected top-up provider for the main "Nạp tiền" button
 let selectedTopUpProvider = null;
 let gatewayTopUpInFlight = false;
@@ -109,6 +148,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const redirected = checkTokenAndRedirect();
     if (redirected) return; // Đang chuyển hướng, dừng lại
 
+    applyRoleBasedDashboardUI();
+
     // Handle payment return params (MoMo/VNPay)
     handlePaymentReturnParams();
 
@@ -118,35 +159,37 @@ document.addEventListener('DOMContentLoaded', function() {
     // Bước 2: Kết nối WebSocket
     connectWebSocket();
 
-    // Phase 4
-    loadRecommendation();
-    loadWalletSummary();
-    loadAvailableVouchers();
+    // Phase 4 (user-only modules)
+    if (!dashboardIsAdmin) {
+        loadRecommendation();
+        loadWalletSummary();
+        loadAvailableVouchers();
 
-    document.getElementById('topUpForm')?.addEventListener('submit', async function (event) {
-        event.preventDefault();
-        await topUpWallet();
-    });
+        document.getElementById('topUpForm')?.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            await topUpWallet();
+        });
 
-    document.getElementById('btnTopUpMomo')?.addEventListener('click', async function () {
-        selectTopUpProvider('momo');
-        await startGatewayTopUp('momo');
-    });
+        document.getElementById('btnTopUpMomo')?.addEventListener('click', async function () {
+            selectTopUpProvider('momo');
+            await startGatewayTopUp('momo');
+        });
 
-    document.getElementById('btnTopUpVnpay')?.addEventListener('click', async function () {
-        selectTopUpProvider('vnpay');
-        await startGatewayTopUp('vnpay');
-    });
+        document.getElementById('btnTopUpVnpay')?.addEventListener('click', async function () {
+            selectTopUpProvider('vnpay');
+            await startGatewayTopUp('vnpay');
+        });
 
-    document.getElementById('withdrawForm')?.addEventListener('submit', async function (event) {
-        event.preventDefault();
-        await withdrawWallet();
-    });
+        document.getElementById('withdrawForm')?.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            await withdrawWallet();
+        });
 
-    document.getElementById('ocrForm')?.addEventListener('submit', async function (event) {
-        event.preventDefault();
-        await simulateOcr();
-    });
+        document.getElementById('ocrForm')?.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            await simulateOcr();
+        });
+    }
 });
 
 // ============================================
@@ -406,6 +449,12 @@ function handleSlotClick(slotName, slotData) {
         return;
     }
 
+    // Admin roles: view slot details (no booking actions)
+    if (dashboardIsAdmin) {
+        showBookingModal(slotName, slotData);
+        return;
+    }
+
     if (slotData.status !== 'AVAILABLE') {
         showToast('warning', `Slot ${slotName} không khả dụng (${getStatusText(slotData.status)})`);
         return;
@@ -430,13 +479,41 @@ function showBookingModal(slotName, slotData) {
         return;
     }
 
-    selectedSlotData = slotData;
+    // Only users can create bookings
+    selectedSlotData = (!dashboardIsAdmin && slotData.status === 'AVAILABLE') ? slotData : null;
     document.getElementById('modalSlotName').textContent = slotName;
     document.getElementById('modalSlotType').textContent = slotData.type || 'N/A';
+    document.getElementById('modalSlotStatus').textContent = getStatusText(slotData.status);
     document.getElementById('modalSlotPrice').textContent =
         slotData.pricePerHour
             ? slotData.pricePerHour.toLocaleString('vi-VN') + ' VNĐ/giờ'
             : 'Chưa cấu hình';
+
+    const occupiedPanel = document.getElementById('occupiedDetailsPanel');
+    if (occupiedPanel) {
+        const isOccupied = (slotData.status || '').toUpperCase() === 'OCCUPIED';
+        occupiedPanel.classList.toggle('d-none', !isOccupied);
+        if (isOccupied) {
+            document.getElementById('modalActiveBookingId').textContent = slotData.activeBookingId ?? '—';
+            document.getElementById('modalActiveVehiclePlate').textContent = slotData.activeVehiclePlate || '—';
+            document.getElementById('modalActiveCheckInTime').textContent = slotData.activeCheckInTime
+                ? new Date(slotData.activeCheckInTime).toLocaleString('vi-VN')
+                : '—';
+        }
+    }
+
+    const modalTitle = document.getElementById('bookingModalLabel');
+    if (modalTitle) {
+        modalTitle.innerHTML = dashboardIsAdmin
+            ? '<i class="bi bi-info-circle me-2"></i>Thông tin Slot'
+            : '<i class="bi bi-p-circle me-2"></i>Xác nhận Đặt chỗ';
+    }
+
+    const confirmBtn = document.getElementById('btnConfirmBooking');
+    if (confirmBtn) {
+        const canBook = !dashboardIsAdmin && (slotData.status === 'AVAILABLE');
+        confirmBtn.classList.toggle('d-none', !canBook);
+    }
 
     const modal = new bootstrap.Modal(document.getElementById('bookingModal'));
     modal.show();
@@ -533,18 +610,6 @@ function showQRModal(bookingData) {
         document.getElementById('qrPlaceholder').style.display = 'block';
     }
 
-    // Gắn bookingId vào nút check-in
-    const checkInBtn = document.getElementById('btnCheckIn');
-    checkInBtn.dataset.bookingId = bookingData.bookingId;
-    // Add-on: nếu booking không còn PENDING thì disable check-in (để dùng modal như "view details")
-    if (bookingData.status && bookingData.status !== 'PENDING') {
-        checkInBtn.disabled = true;
-        checkInBtn.title = 'Booking không còn ở trạng thái PENDING nên không thể check-in.';
-    } else {
-        checkInBtn.disabled = false;
-        checkInBtn.title = '';
-    }
-
     const qrModal = new bootstrap.Modal(document.getElementById('qrModal'));
     qrModal.show();
 }
@@ -574,41 +639,6 @@ async function openBookingDetails(bookingId) {
 }
 
 /**
- * Check-in vào bãi xe — POST /api/bookings/{id}/checkin
- */
-async function doCheckIn(bookingId) {
-    const user = (typeof getStoredUser === 'function')
-        ? getStoredUser()
-        : JSON.parse(localStorage.getItem('user') || 'null');
-    if (!user || !user.token) return;
-
-    const btn = document.getElementById('btnCheckIn');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang vào bãi...';
-
-    try {
-        // Old (kept): const res = await fetch(`http://localhost:8080/api/bookings/${bookingId}/checkin`, {
-        const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/checkin`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${user.token}` }
-        });
-        const data = await res.json();
-        if (res.status === 401) { handleUnauthorized(); return; }
-        if (!res.ok) throw new Error(data.message || 'Check-in thất bại');
-
-        bootstrap.Modal.getInstance(document.getElementById('qrModal')).hide();
-        showToast('success', `✅ Check-in thành công! Slot ${data.slotName} đang đỗ.`);
-        loadBookingHistory();
-        loadWalletSummary();
-
-    } catch (err) {
-        showToast('danger', err.message);
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-box-arrow-in-right me-1"></i>Check-in Vào bãi';
-    }
-}
-
-/**
  * Hủy booking — DELETE /api/bookings/{id}
  */
 async function cancelBooking(bookingId) {
@@ -634,46 +664,6 @@ async function cancelBooking(bookingId) {
 
     } catch (err) {
         showToast('danger', err.message);
-    }
-}
-
-async function doCheckOut(bookingId) {
-    const voucherInput = document.getElementById(`voucherCode-${bookingId}`);
-    const voucherCode = voucherInput ? voucherInput.value.trim() : '';
-    const confirmMessage = voucherCode
-        ? `Xác nhận check-out và áp dụng voucher ${voucherCode}?`
-        : 'Xác nhận check-out và thanh toán bằng ví?';
-    if (!confirm(confirmMessage)) return;
-
-    const user = (typeof getStoredUser === 'function')
-        ? getStoredUser()
-        : JSON.parse(localStorage.getItem('user') || 'null');
-    if (!user || !user.token) return;
-
-    try {
-        const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/checkout`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${user.token}`
-            },
-            body: JSON.stringify({ voucherCode })
-        });
-        const data = await res.json();
-        if (res.status === 401) { handleUnauthorized(); return; }
-        if (!res.ok) throw new Error(data.message || 'Check-out thất bại');
-
-        showToast('success', data.message || `Check-out thành công cho booking #${bookingId}`);
-        loadBookingHistory();
-        loadWalletSummary();
-        loadAvailableVouchers();
-    } catch (err) {
-        const msg = err?.message || String(err);
-        showToast('danger', msg);
-        if (typeof msg === 'string' && msg.toLowerCase().includes('không đủ')) {
-            // Help user recover quickly: go to Wallet tab to top-up.
-            try { switchSidebarTab('tabWallet'); } catch (e) { /* ignore */ }
-        }
     }
 }
 
@@ -724,17 +714,8 @@ async function loadBookingHistory() {
                             <i class="bi bi-qr-code"></i>
                         </button>
                         ${b.status === 'PENDING' ? `
-                            <button class="btn btn-xs btn-success py-0 px-1" onclick="doCheckIn(${b.bookingId})" title="Check-in">
-                                <i class="bi bi-box-arrow-in-right"></i>
-                            </button>
                             <button class="btn btn-xs btn-outline-danger py-0 px-1" onclick="cancelBooking(${b.bookingId})" title="Hủy">
                                 <i class="bi bi-x-lg"></i>
-                            </button>
-                        ` : ''}
-                        ${b.status === 'CHECKED_IN' ? `
-                            <input class="form-control form-control-sm" id="voucherCode-${b.bookingId}" placeholder="Voucher (tùy chọn)">
-                            <button class="btn btn-xs btn-primary py-0 px-1" onclick="doCheckOut(${b.bookingId})" title="Check-out">
-                                <i class="bi bi-box-arrow-right"></i>
                             </button>
                         ` : ''}
                     </div>
