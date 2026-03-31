@@ -8,6 +8,7 @@ import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.parking.smartparking.dto.request.PaymentTopUpCreateRequest;
 import com.parking.smartparking.dto.response.PaymentCreateResponse;
+import com.parking.smartparking.dto.response.PaymentOrderStatusResponse;
 import com.parking.smartparking.service.payment.PaymentService;
 import com.parking.smartparking.service.payment.PaymentService.PaymentCallbackResult;
 
@@ -46,6 +48,14 @@ public class PaymentController {
             HttpServletRequest httpServletRequest) {
         String email = authentication.getName();
         return ResponseEntity.ok(paymentService.createVnpayTopUp(email, request.getAmount(), request.getDescription(), httpServletRequest));
+    }
+
+    @GetMapping("/orders/{orderId}")
+    public ResponseEntity<PaymentOrderStatusResponse> getOrderStatus(
+            @PathVariable String orderId,
+            Authentication authentication) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(paymentService.getOrderStatus(email, orderId));
     }
 
     // =====================

@@ -28,6 +28,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.parking.smartparking.config.PaymentProperties;
 import com.parking.smartparking.dto.response.PaymentCreateResponse;
+import com.parking.smartparking.dto.response.PaymentOrderStatusResponse;
 import com.parking.smartparking.entity.PaymentOrder;
 import com.parking.smartparking.entity.User;
 import com.parking.smartparking.repository.PaymentOrderRepository;
@@ -61,6 +62,9 @@ public class PaymentService {
     @Value("${app.frontend.dashboard-path:/dashboard}")
     private String frontendDashboardPath;
 
+    @Value("${app.wallet.minimum-topup:10000}")
+    private BigDecimal minimumTopUp;
+
     public record PaymentCallbackResult(String provider, String orderId, String status, String message) {
 
     }
@@ -74,6 +78,9 @@ public class PaymentService {
         String secretKey = requireTrimmed(momo.getSecretKey(), "MoMo secretKey");
 
         BigDecimal normalized = normalizeVndAmount(amount);
+        if (minimumTopUp != null && normalized.compareTo(minimumTopUp) < 0) {
+            throw new RuntimeException("Số tiền nạp tối thiểu là " + minimumTopUp.toPlainString() + " VND.");
+        }
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy user: " + email));
@@ -207,6 +214,9 @@ public class PaymentService {
         ensureNotBlank(vnpay.getHashSecret(), "VNPay hashSecret");
 
         BigDecimal normalized = normalizeVndAmount(amount);
+        if (minimumTopUp != null && normalized.compareTo(minimumTopUp) < 0) {
+            throw new RuntimeException("Số tiền nạp tối thiểu là " + minimumTopUp.toPlainString() + " VND.");
+        }
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy user: " + email));
@@ -493,6 +503,34 @@ public class PaymentService {
                 + "&provider=" + UrlUtils.encode(result.provider())
                 + "&orderId=" + UrlUtils.encode(result.orderId() != null ? result.orderId() : "")
                 + "&message=" + UrlUtils.encode(msg);
+    }
+
+    @Transactional(readOnly = true)
+    public PaymentOrderStatusResponse getOrderStatus(String email, String orderId) {
+        if (email == null || email.isBlank()) {
+            throw new RuntimeException("Bạn chưa đăng nhập.");
+        }
+        if (orderId == null || orderId.isBlank()) {
+            throw new RuntimeException("Thiếu orderId.");
+        }
+
+        PaymentOrder order = paymentOrderRepository.findByOrderId(orderId.trim())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy giao dịch."));
+
+        String ownerEmail = order.getUser() != null ? order.getUser().getEmail() : null;
+        if (ownerEmail == null || !ownerEmail.equalsIgnoreCase(email.trim())) {
+            throw new RuntimeException("Không có quyền xem giao dịch này.");
+        }
+
+        return PaymentOrderStatusResponse.builder()
+                .provider(order.getProvider() != null ? order.getProvider().name() : null)
+                .orderId(order.getOrderId())
+                .status(order.getStatus() != null ? order.getStatus().name() : null)
+                .amount(order.getAmount())
+                .message(order.getGatewayMessage())
+                .createdAt(order.getCreatedAt())
+                .paidAt(order.getPaidAt())
+                .build();
     }
 
     private static String resolveClientIp(HttpServletRequest request) {

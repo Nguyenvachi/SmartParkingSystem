@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
+import '../../../core/config/api_config.dart';
 import '../../../core/http/api_client.dart';
 import '../../../core/models/auth_response.dart';
 import '../../../core/storage/token_storage.dart';
 
 import '../../../core/config/app_theme.dart';
+
+import 'forgot_password_page.dart';
+import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
   final VoidCallback onLoggedIn;
@@ -19,10 +25,31 @@ class _LoginPageState extends State<LoginPage> {
   final _api = ApiClient();
   final _tokenStorage = TokenStorage();
 
+  late final GoogleSignIn _googleSignIn;
+
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
 
   bool _loading = false;
+  bool _showPassword = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _googleSignIn = GoogleSignIn(
+      scopes: const ['email', 'profile', 'openid'],
+      serverClientId: ApiConfig.googleServerClientId.isEmpty
+          ? null
+          : ApiConfig.googleServerClientId,
+    );
+  }
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    super.dispose();
+  }
 
   Future<void> _login() async {
     final email = _emailCtrl.text.trim();
@@ -42,6 +69,12 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       final auth = AuthResponse.fromJson((data as Map).cast<String, dynamic>());
+
+      if (auth.role != 'ROLE_USER') {
+        _toast('App mobile chỉ dành cho khách (ROLE_USER).');
+        return;
+      }
+
       await _tokenStorage.saveSession(
         token: auth.token,
         email: auth.email,
@@ -52,8 +85,62 @@ class _LoginPageState extends State<LoginPage> {
       widget.onLoggedIn();
     } on ApiException catch (e) {
       _toast(e.message);
-    } catch (e) {
+    } catch (_) {
       _toast('Đăng nhập thất bại.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loginWithGoogle() async {
+    setState(() => _loading = true);
+    try {
+      // Optional: clear any previous session to avoid stale accounts in dev.
+      await _googleSignIn.signOut();
+      final account = await _googleSignIn.signIn();
+      if (account == null) {
+        _toast('Bạn đã hủy đăng nhập Google.');
+        return;
+      }
+
+      final authData = await account.authentication;
+      final idToken = authData.idToken;
+
+      if (idToken == null || idToken.isEmpty) {
+        _toast(
+            'Không lấy được Google ID token. Vui lòng kiểm tra cấu hình Google Sign-In.');
+        return;
+      }
+
+      final data = await _api.post(
+        '/auth/login/google',
+        auth: false,
+        body: {'idToken': idToken},
+      );
+
+      final auth = AuthResponse.fromJson((data as Map).cast<String, dynamic>());
+      if (auth.role != 'ROLE_USER') {
+        _toast('App mobile chỉ dành cho khách (ROLE_USER).');
+        return;
+      }
+
+      await _tokenStorage.saveSession(
+        token: auth.token,
+        email: auth.email,
+        fullName: auth.fullName,
+        role: auth.role,
+      );
+
+      widget.onLoggedIn();
+    } on ApiException catch (e) {
+      _toast(e.message);
+    } on PlatformException catch (e) {
+      final msg = e.message;
+      _toast(msg == null || msg.isEmpty
+          ? 'Google Sign-In thất bại (${e.code}).'
+          : 'Google Sign-In thất bại (${e.code}): $msg');
+    } catch (e) {
+      _toast('Đăng nhập Google thất bại: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -135,10 +222,37 @@ class _LoginPageState extends State<LoginPage> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: _passCtrl,
-                        decoration:
-                            const InputDecoration(labelText: 'Mật khẩu'),
-                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: 'Mật khẩu',
+                          suffixIcon: IconButton(
+                            onPressed: () =>
+                                setState(() => _showPassword = !_showPassword),
+                            icon: Icon(
+                              _showPassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                          ),
+                        ),
+                        obscureText: !_showPassword,
                         onSubmitted: (_) => _loading ? null : _login(),
+                      ),
+                      const SizedBox(height: 6),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _loading
+                              ? null
+                              : () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const ForgotPasswordPage(),
+                                    ),
+                                  );
+                                },
+                          child: const Text('Quên mật khẩu?'),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       SizedBox(
@@ -155,6 +269,50 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
                                 )
                               : const Text('Đăng nhập'),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Expanded(child: Divider()),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: Text(
+                              'hoặc',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: AppTheme.brandInkSoft),
+                            ),
+                          ),
+                          const Expanded(child: Divider()),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _loading ? null : _loginWithGoogle,
+                          icon: const Icon(Icons.g_mobiledata, size: 22),
+                          label: const Text('Đăng nhập bằng Google'),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextButton(
+                          onPressed: _loading
+                              ? null
+                              : () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => RegisterPage(
+                                        onLoggedIn: widget.onLoggedIn,
+                                      ),
+                                    ),
+                                  );
+                                },
+                          child: const Text('Chưa có tài khoản? Đăng ký'),
                         ),
                       ),
                     ],

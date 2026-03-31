@@ -46,8 +46,9 @@ lib/
 ### Auth
 - `POST /api/auth/register`
 - `POST /api/auth/login`
-- (optional) `POST /api/auth/forgot-password`
-- (optional) `POST /api/auth/reset-password`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
+- `POST /api/auth/login/google` (Mobile Google Sign-In: gửi `idToken`)
 
 ### Slots (Dashboard)
 - `GET /api/slots`
@@ -80,3 +81,33 @@ lib/
 - Thêm header `Authorization: Bearer <token>` cho các API cần JWT.
 - Với emulator Android, gọi backend local Docker qua `10.0.2.2:8080`.
 - Nếu deploy VPS, cấu hình CORS ở `.env` theo domain frontend/mobile origin (xem [DEPLOYMENT.md](../DEPLOYMENT.md)).
+
+## 6) Auth module flow (ROLE_USER only)
+
+Mobile app chỉ dành cho End-User (ROLE_USER).
+
+- Nếu đăng nhập ra role khác `ROLE_USER` → app sẽ chặn và không lưu session.
+
+## 7) Test checklist (Auth)
+
+### Email/Password
+1) Mở app → Login
+2) Nhập email/password hợp lệ → vào app (token lưu secure storage)
+3) Kill app + mở lại → vẫn đăng nhập (còn token)
+4) Nhập sai password → hiển thị message lỗi từ backend
+
+### Forgot/Reset password (dev/demo)
+1) Ở Login → bấm "Quên mật khẩu?" → nhập email
+2) Backend trả `resetToken` (nếu bật `APP_PASSWORD_RESET_EXPOSE_TOKEN=true`) → copy token
+3) Vào màn "Đặt lại" → nhập token + mật khẩu mới + confirm → thành công
+4) Quay lại Login → đăng nhập bằng mật khẩu mới
+
+### Google Sign-In
+1) Ở Login → bấm "Đăng nhập bằng Google"
+2) Chọn Google account → app lấy `idToken` và gọi `POST /api/auth/login/google`
+3) Backend trả JWT → app vào màn chính
+
+Ghi chú:
+- Android cần cấu hình đúng SHA-1/SHA-256 + Android OAuth client.
+- Khi chạy app, cần truyền Web Client ID làm `serverClientId` để lấy `idToken` đúng audience:
+  `flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=<WEB_CLIENT_ID>.apps.googleusercontent.com`
