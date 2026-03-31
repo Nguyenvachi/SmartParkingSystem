@@ -4,7 +4,11 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.MailException;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +31,7 @@ public class PasswordResetService {
     private final UserRepository userRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ObjectProvider<JavaMailSender> mailSenderProvider;
 
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -35,6 +40,12 @@ public class PasswordResetService {
 
     @Value("${app.security.password-reset.expose-token:false}")
     private boolean exposeToken;
+
+    @Value("${app.mail.enabled:false}")
+    private boolean mailEnabled;
+
+    @Value("${app.mail.from:no-reply@smartparking.local}")
+    private String mailFrom;
 
     @Transactional
     public ForgotPasswordResponse createResetToken(String email) {
@@ -58,10 +69,56 @@ public class PasswordResetService {
 
         passwordResetTokenRepository.save(entity);
 
+        // Best-effort email sending (do not leak user existence or fail request)
+        trySendResetEmail(user, rawToken);
+
         return ForgotPasswordResponse.builder()
                 .message("Nếu email tồn tại, hệ thống đã tạo yêu cầu reset mật khẩu. Vui lòng kiểm tra email hoặc dùng token demo.")
                 .resetToken(exposeToken ? rawToken : null)
                 .build();
+    }
+
+    private void trySendResetEmail(User user, String rawToken) {
+        if (!mailEnabled) {
+            return;
+        }
+        if (user == null) {
+            return;
+        }
+        String to = user.getEmail() != null ? user.getEmail().trim() : "";
+        if (to.isBlank()) {
+            return;
+        }
+        if (rawToken == null || rawToken.isBlank()) {
+            return;
+        }
+
+        JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
+        if (mailSender == null) {
+            return;
+        }
+
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(mailFrom);
+            message.setTo(to);
+            message.setSubject("[SmartParking] Reset mật khẩu");
+            message.setText(renderResetMailText(user, rawToken));
+            mailSender.send(message);
+        } catch (MailException ignored) {
+            // Best-effort: do not fail forgot-password flow on mail issues.
+        }
+    }
+
+    private String renderResetMailText(User user, String rawToken) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Yêu cầu reset mật khẩu SmartParking\n\n");
+        sb.append("Tài khoản: ").append(user.getEmail()).append("\n");
+        sb.append("Token reset: ").append(rawToken).append("\n");
+        sb.append("Hết hạn sau: ").append(expiryMinutes).append(" phút\n\n");
+        sb.append("Mở app SmartParking > Quên mật khẩu > Nhập token trên để đặt mật khẩu mới.\n");
+        sb.append("Nếu bạn không yêu cầu, hãy bỏ qua email này.\n");
+        return sb.toString();
     }
 
     @Transactional

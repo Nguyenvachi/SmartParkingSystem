@@ -70,6 +70,23 @@ Mẫu `.env` tối thiểu:
 # Public base URL của frontend (dùng cho link redirect/reset password)
 APP_FRONTEND_BASE_URL=http://smartparking.id.vn
 
+# Payment gateways (MoMo/VNPay)
+# Base URL public (HTTPS) của backend để gateway gọi callback/IPN.
+# Khi test local: dùng ngrok/cloudflared và set vào đây.
+APP_PAYMENT_BACKEND_BASE_URL=https://api.smartparking.id.vn
+
+# Email (Invoice + Forgot/Reset password)
+# Bật gửi mail best-effort (không làm fail API nếu SMTP lỗi).
+APP_MAIL_ENABLED=false
+APP_MAIL_FROM=no-reply@smartparking.id.vn
+# Cấu hình SMTP (ví dụ Gmail SMTP)
+# SPRING_MAIL_HOST=smtp.gmail.com
+# SPRING_MAIL_PORT=587
+# SPRING_MAIL_USERNAME=your_email@gmail.com
+# SPRING_MAIL_PASSWORD=your_app_password
+# SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true
+# SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true
+
 # CORS / WebSocket: cho phép domain frontend gọi API
 APP_CORS_ALLOWED_ORIGINS=http://smartparking.id.vn,http://www.smartparking.id.vn
 APP_WS_ALLOWED_ORIGIN_PATTERNS=http://smartparking.id.vn,http://www.smartparking.id.vn

@@ -14,6 +14,8 @@ import org.mockito.Mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -34,10 +36,17 @@ class PasswordResetServiceTests {
     @Mock
     private PasswordResetTokenRepository passwordResetTokenRepository;
 
+    @Mock
+    private ObjectProvider<JavaMailSender> mailSenderProvider;
+
     @Test
     void shouldCreateResetTokenAndExposeWhenEnabled() {
         PasswordEncoder encoder = new BCryptPasswordEncoder();
-        PasswordResetService service = new PasswordResetService(userRepository, passwordResetTokenRepository, encoder);
+        PasswordResetService service = new PasswordResetService(
+                userRepository,
+                passwordResetTokenRepository,
+                encoder,
+                mailSenderProvider);
         ReflectionTestUtils.setField(service, "expiryMinutes", 15);
         ReflectionTestUtils.setField(service, "exposeToken", true);
 
@@ -54,7 +63,11 @@ class PasswordResetServiceTests {
     @Test
     void shouldResetPasswordWithValidToken() {
         PasswordEncoder encoder = new BCryptPasswordEncoder();
-        PasswordResetService service = new PasswordResetService(userRepository, passwordResetTokenRepository, encoder);
+        PasswordResetService service = new PasswordResetService(
+                userRepository,
+                passwordResetTokenRepository,
+                encoder,
+                mailSenderProvider);
         ReflectionTestUtils.setField(service, "expiryMinutes", 15);
         ReflectionTestUtils.setField(service, "exposeToken", false);
 
@@ -85,7 +98,11 @@ class PasswordResetServiceTests {
     @Test
     void shouldRejectResetWhenTokenDoesNotMatch() {
         PasswordEncoder encoder = new BCryptPasswordEncoder();
-        PasswordResetService service = new PasswordResetService(userRepository, passwordResetTokenRepository, encoder);
+        PasswordResetService service = new PasswordResetService(
+                userRepository,
+                passwordResetTokenRepository,
+                encoder,
+                mailSenderProvider);
         ReflectionTestUtils.setField(service, "expiryMinutes", 15);
 
         User user = User.builder().id(10L).email("user@test.com").fullName("User").password("old").build();

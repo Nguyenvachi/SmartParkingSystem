@@ -4,6 +4,10 @@
 .pub/
 build/
 
+# Generated plugin registries
+.flutter-plugins
+.flutter-plugins-dependencies
+
 # IDE
 .idea/
 .vscode/
