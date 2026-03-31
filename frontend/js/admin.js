@@ -69,6 +69,8 @@ async function initializeAdminConsole() {
         return;
     }
 
+    // Staff-only navigation
+    document.getElementById('navScannerItem')?.classList.remove('d-none');
     document.getElementById('navAdminItem')?.classList.remove('d-none');
     document.getElementById('adminConsoleSection')?.classList.remove('d-none');
     document.getElementById('adminRoleBadge').textContent = formatRoleLabel(user.role);
@@ -163,6 +165,10 @@ async function loadAdminSummary() {
         document.getElementById('summaryReservedCount').textContent = summary.reservedSlots;
         document.getElementById('summaryOccupiedCount').textContent = summary.occupiedSlots;
         document.getElementById('summaryBlacklistCount').textContent = summary.activeBlacklistEntries;
+        document.getElementById('summaryRevenueToday').textContent = formatCurrency(summary.revenueToday);
+        document.getElementById('summaryRevenueMonth').textContent = formatCurrency(summary.revenueThisMonth);
+        document.getElementById('summaryRevenueAllTime').textContent = formatCurrency(summary.revenueAllTime);
+        document.getElementById('summaryCompletedToday').textContent = summary.completedBookingsToday ?? 0;
         document.getElementById('adminScopeNotice').textContent = summary.globalAdmin
             ? 'Bạn đang ở chế độ Admin tổng: xem và phân quyền toàn hệ thống.'
             : `Bạn đang ở chế độ Admin chi nhánh ${normalizedBranchCode(summary.branchCode) || 'MAIN'}: chỉ quản lý dữ liệu thuộc chi nhánh của mình.`;

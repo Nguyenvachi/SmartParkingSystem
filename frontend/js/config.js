@@ -22,9 +22,18 @@
 const SMARTPARKING_CONFIG = (window && window.SMARTPARKING_CONFIG) ? window.SMARTPARKING_CONFIG : {};
 
 // Default to same-origin so the app works when accessed via LAN IP on mobile.
-// Nginx proxies /api and /ws to backend inside Docker.
-const API_BASE_URL = SMARTPARKING_CONFIG.API_BASE_URL || `${window.location.origin}/api`;
-const WS_BASE_URL = SMARTPARKING_CONFIG.WS_BASE_URL || `${window.location.origin}/ws`;
+// In Docker/VPS, Nginx proxies /api and /ws to backend.
+// In local dev (npx serve), there is no proxy, so we fall back to backend :8080.
+const SAME_ORIGIN_API = `${window.location.origin}/api`;
+const SAME_ORIGIN_WS = `${window.location.origin}/ws`;
+
+const isLocalhost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const isLikelyServeDev = isLocalhost && String(window.location.port) === '3000';
+
+const API_BASE_URL = SMARTPARKING_CONFIG.API_BASE_URL
+	|| (isLikelyServeDev ? 'http://localhost:8080/api' : SAME_ORIGIN_API);
+const WS_BASE_URL = SMARTPARKING_CONFIG.WS_BASE_URL
+	|| (isLikelyServeDev ? 'http://localhost:8080/ws' : SAME_ORIGIN_WS);
 
 // Old clean-URL routes kept for traceability.
 // const FRONTEND_BASE_URL = window.location.origin;

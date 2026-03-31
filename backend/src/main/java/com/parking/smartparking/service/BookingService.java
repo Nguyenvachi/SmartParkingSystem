@@ -58,6 +58,7 @@ public class BookingService {
     private final PricingService pricingService;
     private final WalletService walletService;
     private final VoucherService voucherService;
+    private final InvoiceService invoiceService;
     private final BlacklistService blacklistService;
 
     /**
@@ -221,9 +222,50 @@ public class BookingService {
         bookingRepository.save(booking);
 
         // WebSocket broadcast (Tech Key #5)
-        webSocketController.sendSlotUpdate(toSlotResponse(slot));
+        webSocketController.sendSlotUpdate(toSlotResponse(slot, booking));
 
         log.info("🚗 Check-in: Booking #{} → Slot [{}] OCCUPIED", bookingId, slot.getSlotName());
+        return toResponse(booking, "Check-in thành công! Xe đã vào bãi.");
+    }
+
+    /**
+     * Staff check-in (Gate/Guard): cho phép ROLE_ADMIN / ROLE_BRANCH_ADMIN
+     * check-in theo bookingId.
+     *
+     * Lưu ý: Vẫn verify chữ ký QR (Tech Key #7) và blacklist trước khi
+     * check-in.
+     */
+    @Transactional
+    public BookingResponse checkInAsStaff(Long bookingId, String staffEmail) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy booking #" + bookingId));
+
+        if (booking.getStatus() != Booking.BookingStatus.PENDING) {
+            throw new RuntimeException(
+                    "Booking không ở trạng thái PENDING (hiện tại: " + booking.getStatus() + ")");
+        }
+
+        if (LocalDateTime.now().isAfter(booking.getExpiryTime())) {
+            throw new RuntimeException("Booking đã hết hạn 15 phút. Vui lòng tạo booking mới.");
+        }
+
+        validateBookingQrSignature(booking);
+        blacklistService.assertVehicleAllowed(booking.getVehiclePlate(), booking.getParkingSlot().getBranchCode());
+
+        booking.setStatus(Booking.BookingStatus.CHECKED_IN);
+        booking.setCheckInTime(LocalDateTime.now());
+
+        ParkingSlot slot = booking.getParkingSlot();
+        slot.setStatus("OCCUPIED");
+        parkingSlotRepository.save(slot);
+        bookingRepository.save(booking);
+
+        webSocketController.sendSlotUpdate(toSlotResponse(slot, booking));
+
+        log.info("🛡️ Staff check-in: Booking #{} by {} → Slot [{}] OCCUPIED",
+                bookingId,
+                staffEmail,
+                slot.getSlotName());
         return toResponse(booking, "Check-in thành công! Xe đã vào bãi.");
     }
 
@@ -293,8 +335,83 @@ public class BookingService {
                         totalAmount.toPlainString(), voucherMessage, pricingResult.note())
                 : "Check-out thành công. " + pricingResult.note();
 
-        log.info("🏁 Check-out: Booking #{} → Slot [{}] AVAILABLE | total={}",
+        log.info("🏁 Check-out: Booking #{} → Slot [{}] AVAILABLE | total={} ",
                 bookingId, slot.getSlotName(), totalAmount);
+        return toResponse(booking, checkoutMessage);
+    }
+
+    /**
+     * Staff check-out (Gate/Guard): cho phép ROLE_ADMIN / ROLE_BRANCH_ADMIN
+     * check-out theo bookingId (không phụ thuộc owner).
+     *
+     * Lưu ý: Vẫn tính phí và trừ ví của user sở hữu booking.
+     */
+    @Transactional
+    public BookingResponse checkOutAsStaff(Long bookingId, String staffEmail, CheckoutRequest request) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy booking #" + bookingId));
+
+        if (booking.getStatus() != Booking.BookingStatus.CHECKED_IN) {
+            throw new RuntimeException(
+                    "Chỉ có thể check-out booking ở trạng thái CHECKED_IN (hiện tại: " + booking.getStatus() + ")");
+        }
+
+        if (booking.getCheckInTime() == null) {
+            throw new RuntimeException("Booking chưa có thời gian check-in hợp lệ.");
+        }
+
+        User user = booking.getUser();
+        LocalDateTime checkOutTime = LocalDateTime.now();
+        PricingService.PricingResult pricingResult = pricingService.calculateCheckoutAmount(booking, user, checkOutTime);
+
+        BigDecimal subtotalAmount = pricingResult.totalAmount();
+        VoucherService.AppliedVoucher appliedVoucher = voucherService.applyVoucherToAmount(
+                request != null ? request.getVoucherCode() : null,
+                subtotalAmount);
+
+        BigDecimal totalAmount = subtotalAmount.subtract(appliedVoucher.discountAmount());
+        if (totalAmount.signum() > 0) {
+            walletService.chargeForParking(
+                    user,
+                    totalAmount,
+                    String.format(
+                            "Thanh toán booking #%d - slot %s%s",
+                            booking.getId(),
+                            booking.getParkingSlot().getSlotName(),
+                            appliedVoucher.code() != null ? " | voucher " + appliedVoucher.code() : ""));
+        }
+
+        booking.setStatus(Booking.BookingStatus.COMPLETED);
+        booking.setCheckOutTime(checkOutTime);
+        booking.setTotalAmount(totalAmount);
+        booking.setDiscountAmount(appliedVoucher.discountAmount());
+        booking.setAppliedVoucherCode(appliedVoucher.code());
+
+        ParkingSlot slot = booking.getParkingSlot();
+        slot.setStatus("AVAILABLE");
+        parkingSlotRepository.save(slot);
+        bookingRepository.save(booking);
+
+        invoiceService.createAndMaybeSendForCompletedBooking(booking);
+
+        webSocketController.sendSlotUpdate(toSlotResponse(slot));
+
+        String voucherMessage = appliedVoucher.code() != null
+                ? String.format(" Đã áp dụng voucher %s, giảm %s VND.",
+                        appliedVoucher.code(), appliedVoucher.discountAmount().toPlainString())
+                : "";
+
+        String checkoutMessage = totalAmount.signum() > 0
+                ? String.format("Check-out thành công. Đã trừ %s VND từ ví.%s %s",
+                        totalAmount.toPlainString(), voucherMessage, pricingResult.note())
+                : "Check-out thành công. " + pricingResult.note();
+
+        log.info("🛡️ Staff check-out: Booking #{} by {} → Slot [{}] AVAILABLE | total={}",
+                bookingId,
+                staffEmail,
+                slot.getSlotName(),
+                totalAmount);
+
         return toResponse(booking, checkoutMessage);
     }
 
@@ -327,12 +444,21 @@ public class BookingService {
 
     // =================== HELPER METHODS ===================
     private ParkingSlotResponse toSlotResponse(ParkingSlot slot) {
+        return toSlotResponse(slot, null);
+    }
+
+    private ParkingSlotResponse toSlotResponse(ParkingSlot slot, Booking activeBooking) {
+        Booking active = ("OCCUPIED".equalsIgnoreCase(slot.getStatus())) ? activeBooking : null;
         return ParkingSlotResponse.builder()
                 .id(slot.getId())
                 .slotName(slot.getSlotName())
                 .type(slot.getType())
                 .status(slot.getStatus())
                 .pricePerHour(slot.getPricePerHour())
+                .branchCode(slot.getBranchCode())
+                .activeBookingId(active != null ? active.getId() : null)
+                .activeVehiclePlate(active != null ? active.getVehiclePlate() : null)
+                .activeCheckInTime(active != null ? active.getCheckInTime() : null)
                 .version(slot.getVersion())
                 .build();
     }

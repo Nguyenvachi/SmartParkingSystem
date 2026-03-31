@@ -22,6 +22,7 @@ import com.parking.smartparking.entity.BlacklistedVehicle;
 import com.parking.smartparking.entity.ParkingSlot;
 import com.parking.smartparking.entity.User;
 import com.parking.smartparking.repository.BlacklistedVehicleRepository;
+import com.parking.smartparking.repository.BookingRepository;
 import com.parking.smartparking.repository.ParkingSlotRepository;
 import com.parking.smartparking.repository.UserRepository;
 
@@ -37,6 +38,9 @@ class AdminManagementServiceTests {
 
     @Mock
     private BlacklistedVehicleRepository blacklistedVehicleRepository;
+
+    @Mock
+    private BookingRepository bookingRepository;
 
     @Test
     void shouldReturnBranchScopedSummaryForBranchAdmin() {
@@ -118,6 +122,6 @@ class AdminManagementServiceTests {
     }
 
     private AdminManagementService createService() {
-        return new AdminManagementService(userRepository, parkingSlotRepository, blacklistedVehicleRepository);
+        return new AdminManagementService(userRepository, parkingSlotRepository, blacklistedVehicleRepository, bookingRepository);
     }
 }

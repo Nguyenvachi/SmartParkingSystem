@@ -18,6 +18,7 @@ import com.parking.smartparking.controller.WebSocketController;
 import com.parking.smartparking.dto.request.ParkingSlotRequest;
 import com.parking.smartparking.entity.ParkingSlot;
 import com.parking.smartparking.entity.User;
+import com.parking.smartparking.repository.BookingRepository;
 import com.parking.smartparking.repository.ParkingSlotRepository;
 import com.parking.smartparking.repository.UserRepository;
 
@@ -27,6 +28,9 @@ class ParkingSlotServiceTests {
 
     @Mock
     private ParkingSlotRepository parkingSlotRepository;
+
+    @Mock
+    private BookingRepository bookingRepository;
 
     @Mock
     private WebSocketController webSocketController;
@@ -212,6 +216,6 @@ class ParkingSlotServiceTests {
     }
 
     private ParkingSlotService createService() {
-        return new ParkingSlotService(parkingSlotRepository, userRepository, webSocketController);
+        return new ParkingSlotService(parkingSlotRepository, bookingRepository, userRepository, webSocketController);
     }
 }

@@ -1,10 +1,13 @@
 package com.parking.smartparking.repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.parking.smartparking.entity.Booking;
@@ -70,4 +73,77 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
      * Rule mới (Phase 1): 1 user chỉ được có tối đa 1 booking đang active.
      */
     boolean existsByUser_EmailAndStatusIn(String email, List<Booking.BookingStatus> statuses);
+
+    List<Booking> findByParkingSlot_IdInAndStatus(List<Long> slotIds, Booking.BookingStatus status);
+
+    Optional<Booking> findFirstByParkingSlot_IdAndStatusOrderByCheckInTimeDesc(Long slotId, Booking.BookingStatus status);
+
+    @Query("""
+            select coalesce(sum(b.totalAmount), 0)
+            from Booking b
+            where b.status = :status
+              and b.checkOutTime >= :start
+              and b.checkOutTime < :end
+            """)
+    BigDecimal sumTotalAmountByStatusAndCheckOutTimeBetween(
+            @Param("status") Booking.BookingStatus status,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
+
+    @Query("""
+            select coalesce(sum(b.totalAmount), 0)
+            from Booking b
+            where b.status = :status
+              and b.checkOutTime >= :start
+              and b.checkOutTime < :end
+              and upper(coalesce(b.parkingSlot.branchCode, 'MAIN')) = :branchCode
+            """)
+    BigDecimal sumTotalAmountByStatusAndCheckOutTimeBetweenForBranch(
+            @Param("status") Booking.BookingStatus status,
+            @Param("branchCode") String branchCode,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
+
+    @Query("""
+            select count(b)
+            from Booking b
+            where b.status = :status
+              and b.checkOutTime >= :start
+              and b.checkOutTime < :end
+            """)
+    long countByStatusAndCheckOutTimeBetween(
+            @Param("status") Booking.BookingStatus status,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
+
+    @Query("""
+            select count(b)
+            from Booking b
+            where b.status = :status
+              and b.checkOutTime >= :start
+              and b.checkOutTime < :end
+              and upper(coalesce(b.parkingSlot.branchCode, 'MAIN')) = :branchCode
+            """)
+    long countByStatusAndCheckOutTimeBetweenForBranch(
+            @Param("status") Booking.BookingStatus status,
+            @Param("branchCode") String branchCode,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
+
+    @Query("""
+            select coalesce(sum(b.totalAmount), 0)
+            from Booking b
+            where b.status = :status
+            """)
+    BigDecimal sumTotalAmountByStatus(@Param("status") Booking.BookingStatus status);
+
+    @Query("""
+            select coalesce(sum(b.totalAmount), 0)
+            from Booking b
+            where b.status = :status
+              and upper(coalesce(b.parkingSlot.branchCode, 'MAIN')) = :branchCode
+            """)
+    BigDecimal sumTotalAmountByStatusForBranch(
+            @Param("status") Booking.BookingStatus status,
+            @Param("branchCode") String branchCode);
 }

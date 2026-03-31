@@ -1,5 +1,7 @@
 package com.parking.smartparking.dto.response;
 
+import java.math.BigDecimal;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,4 +23,11 @@ public class AdminDashboardSummaryResponse {
     private long occupiedSlots;
     private long maintenanceSlots;
     private long activeBlacklistEntries;
+
+    private BigDecimal revenueToday;
+    private BigDecimal revenueThisMonth;
+    private BigDecimal revenueAllTime;
+
+    private long completedBookingsToday;
+    private long completedBookingsThisMonth;
 }
