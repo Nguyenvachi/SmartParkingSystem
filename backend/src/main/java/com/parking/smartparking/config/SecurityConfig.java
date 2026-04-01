@@ -75,6 +75,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/wallet/**").hasAuthority("ROLE_USER")
                 .requestMatchers(HttpMethod.GET, "/api/audit-logs/**").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/admin/summary").hasAnyAuthority("ROLE_ADMIN", "ROLE_BRANCH_ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/admin/mail/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_BRANCH_ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/admin/users/**").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/admin/users/**").hasAuthority("ROLE_ADMIN")
                 .requestMatchers("/api/blacklist/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_BRANCH_ADMIN")

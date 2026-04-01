@@ -9,6 +9,13 @@ Prerequisites: Docker Desktop.
 docker compose up --build
 ```
 
+## Email (Gmail SMTP) notes
+
+- Docker Compose sẽ tự load file `.env` ở root.
+- Khi chạy backend local bằng `mvnw.cmd spring-boot:run` / IDE, backend cũng sẽ tự đọc `.env` (best-effort) để map `SPRING_MAIL_*` → `spring.mail.*`.
+	- Cách khuyến nghị (an toàn hơn): cấu hình mail trong `backend/application-secrets.properties` (file này đã được ignore bởi Git),
+		hoặc set environment variables khi chạy.
+
 ## Deploy on VPS
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for a copy-paste VPS + DNS + `.env` checklist.

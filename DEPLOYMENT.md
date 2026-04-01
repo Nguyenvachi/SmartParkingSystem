@@ -72,7 +72,10 @@ APP_FRONTEND_BASE_URL=http://smartparking.id.vn
 
 # Payment gateways (MoMo/VNPay)
 # Base URL public (HTTPS) của backend để gateway gọi callback/IPN.
-# Khi test local: dùng ngrok/cloudflared và set vào đây.
+# Khi test local:
+# - Android emulator: có thể dùng `http://10.0.2.2:8080` (10.0.2.2 = máy host nhìn từ emulator)
+# - Điện thoại thật cùng LAN: dùng `http://<LAN_IP_OF_YOUR_PC>:8080`
+# - Nếu gateway cần gọi IPN từ internet: dùng ngrok/cloudflared (HTTPS) và set vào đây.
 APP_PAYMENT_BACKEND_BASE_URL=https://api.smartparking.id.vn
 
 # Email (Invoice + Forgot/Reset password)
@@ -86,6 +89,17 @@ APP_MAIL_FROM=no-reply@smartparking.id.vn
 # SPRING_MAIL_PASSWORD=your_app_password
 # SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true
 # SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true
+
+# Test local nhanh (không cần SMTP thật): dùng Mailpit trong docker-compose
+# - Mở inbox: http://localhost:8025
+# - Cấu hình .env:
+#   APP_MAIL_ENABLED=true
+#   APP_MAIL_FROM=no-reply@smartparking.local
+#   SPRING_MAIL_HOST=mailpit
+#   SPRING_MAIL_PORT=1025
+
+Ghi chú: `.env` chỉ áp dụng khi chạy bằng Docker Compose. Nếu chạy backend local (mvn/IDE), hãy cấu hình mail bằng
+`backend/application-secrets.properties` hoặc environment variables của hệ điều hành.
 
 # CORS / WebSocket: cho phép domain frontend gọi API
 APP_CORS_ALLOWED_ORIGINS=http://smartparking.id.vn,http://www.smartparking.id.vn

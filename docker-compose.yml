@@ -1,4 +1,11 @@
 services:
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: sp_mailpit
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025" # SMTP
+      - "${MAILPIT_WEB_PORT:-8025}:8025" # Web UI
+
   mysql:
     image: mysql:8.4
     container_name: sp_mysql
@@ -20,6 +27,8 @@ services:
       context: ./backend
     container_name: sp_backend
     depends_on:
+      mailpit:
+        condition: service_started
       mysql:
         condition: service_healthy
     # env_file:
