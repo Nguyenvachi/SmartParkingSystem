@@ -35,10 +35,21 @@ async function apiRequest(endpoint, options = {}) {
     
     try {
         const response = await fetch(url, config);
-        const data = await response.json();
+        const contentType = (response.headers.get('content-type') || '').toLowerCase();
+        let data = null;
+        if (contentType.includes('application/json')) {
+            data = await response.json();
+        } else {
+            const text = await response.text();
+            // Nginx 502/503 often returns HTML; keep it readable.
+            data = { message: text ? String(text).slice(0, 500) : '' };
+        }
         
         if (!response.ok) {
-            throw new Error(data.message || `HTTP error! status: ${response.status}`);
+            const hint = (response.status === 502 || response.status === 503)
+                ? ' (backend/proxy đang lỗi hoặc backend chưa chạy)'
+                : '';
+            throw new Error((data && data.message ? data.message : `HTTP error! status: ${response.status}`) + hint);
         }
         
         return { success: true, data };
