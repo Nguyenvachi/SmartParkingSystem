@@ -20,6 +20,8 @@ docker compose up --build
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for a copy-paste VPS + DNS + `.env` checklist.
 
+You can start from the template [.env.vps.example](.env.vps.example) (copy it to `.env` on the VPS and fill values).
+
 - Frontend: http://localhost:3000 (clean URLs: `/login`, `/dashboard`)
 - Backend API: http://localhost:8080/api
 - MySQL: localhost:3306 (db: `smartparking_db`, user: `root`, pass: `root`)

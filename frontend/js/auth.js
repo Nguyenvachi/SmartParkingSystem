@@ -61,6 +61,15 @@ document.addEventListener('DOMContentLoaded', function () {
 // 1. XỬ LÝ ĐĂNG NHẬP
 // ============================================
 
+async function parseJsonOrText(response) {
+    const contentType = (response.headers.get('content-type') || '').toLowerCase();
+    if (contentType.includes('application/json')) {
+        return await response.json();
+    }
+    const text = await response.text();
+    return { message: text ? String(text).slice(0, 500) : '' };
+}
+
 function setAuthMode(mode) {
     const loginForm = document.getElementById('loginForm');
     const forgotForm = document.getElementById('forgotPasswordForm');
@@ -121,7 +130,7 @@ document.getElementById('loginForm')?.addEventListener('submit', async function 
             body: JSON.stringify({ email, password })
         });
 
-        const data = await response.json();
+        const data = await parseJsonOrText(response);
 
         if (response.ok) {
             // Đăng nhập thành công
@@ -140,7 +149,10 @@ document.getElementById('loginForm')?.addEventListener('submit', async function 
 
         } else {
             // Đăng nhập thất bại
-            throw new Error(data.message || 'Email hoặc mật khẩu không đúng');
+            const hint = (response.status === 502 || response.status === 503)
+                ? ' (backend/proxy đang lỗi hoặc backend chưa chạy)'
+                : '';
+            throw new Error((data.message || 'Email hoặc mật khẩu không đúng') + hint);
         }
 
     } catch (error) {
@@ -192,7 +204,7 @@ document.getElementById('registerForm')?.addEventListener('submit', async functi
             body: JSON.stringify({ fullName, email, password })
         });
 
-        const data = await response.json();
+        const data = await parseJsonOrText(response);
 
         if (response.ok) {
             showAlert('success', 'Đăng ký thành công! Đang chuyển đến trang đăng nhập...');
@@ -204,7 +216,10 @@ document.getElementById('registerForm')?.addEventListener('submit', async functi
             }, 1500);
 
         } else {
-            throw new Error(data.message || 'Đăng ký thất bại');
+            const hint = (response.status === 502 || response.status === 503)
+                ? ' (backend/proxy đang lỗi hoặc backend chưa chạy)'
+                : '';
+            throw new Error((data.message || 'Đăng ký thất bại') + hint);
         }
 
     } catch (error) {
@@ -238,9 +253,12 @@ document.getElementById('forgotPasswordForm')?.addEventListener('submit', async 
             body: JSON.stringify({ email })
         });
 
-        const data = await response.json();
+        const data = await parseJsonOrText(response);
         if (!response.ok) {
-            throw new Error(data.message || 'Không thể tạo yêu cầu reset mật khẩu.');
+            const hint = (response.status === 502 || response.status === 503)
+                ? ' (backend/proxy đang lỗi hoặc backend chưa chạy)'
+                : '';
+            throw new Error((data.message || 'Không thể tạo yêu cầu reset mật khẩu.') + hint);
         }
 
         showAlert('success', data.message || 'Đã tạo yêu cầu reset mật khẩu.');
@@ -289,9 +307,12 @@ document.getElementById('resetPasswordForm')?.addEventListener('submit', async f
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, token, newPassword, confirmPassword })
         });
-        const data = await response.json();
+        const data = await parseJsonOrText(response);
         if (!response.ok) {
-            throw new Error(data.message || 'Đặt lại mật khẩu thất bại.');
+            const hint = (response.status === 502 || response.status === 503)
+                ? ' (backend/proxy đang lỗi hoặc backend chưa chạy)'
+                : '';
+            throw new Error((data.message || 'Đặt lại mật khẩu thất bại.') + hint);
         }
 
         showAlert('success', data.message || 'Đặt lại mật khẩu thành công.');
