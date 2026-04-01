@@ -36,9 +36,10 @@ public class PaymentController {
     @PostMapping("/topup/momo")
     public ResponseEntity<PaymentCreateResponse> createMomoTopUp(
             @Valid @RequestBody PaymentTopUpCreateRequest request,
-            Authentication authentication) {
+            Authentication authentication,
+            HttpServletRequest httpServletRequest) {
         String email = authentication.getName();
-        return ResponseEntity.ok(paymentService.createMomoTopUp(email, request.getAmount(), request.getDescription()));
+        return ResponseEntity.ok(paymentService.createMomoTopUp(email, request.getAmount(), request.getDescription(), httpServletRequest));
     }
 
     @PostMapping("/topup/vnpay")
@@ -64,7 +65,7 @@ public class PaymentController {
     @GetMapping("/callback/momo/return")
     public void momoReturn(HttpServletRequest request, HttpServletResponse response) throws IOException {
         PaymentCallbackResult result = paymentService.handleMomoCallback(flattenParams(request), true);
-        response.sendRedirect(paymentService.buildFrontendRedirectUrl(result));
+        response.sendRedirect(paymentService.buildFrontendRedirectUrl(result, request));
     }
 
     @PostMapping("/callback/momo/ipn")
@@ -90,7 +91,7 @@ public class PaymentController {
     @GetMapping("/callback/vnpay/return")
     public void vnpayReturn(HttpServletRequest request, HttpServletResponse response) throws IOException {
         PaymentCallbackResult result = paymentService.handleVnpayReturn(flattenParams(request));
-        response.sendRedirect(paymentService.buildFrontendRedirectUrl(result));
+        response.sendRedirect(paymentService.buildFrontendRedirectUrl(result, request));
     }
 
     @GetMapping("/callback/vnpay/ipn")

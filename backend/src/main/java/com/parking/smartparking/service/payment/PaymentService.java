@@ -45,6 +45,8 @@ import lombok.extern.slf4j.Slf4j;
 @SuppressWarnings("null")
 public class PaymentService {
 
+    private static final String DEFAULT_BACKEND_BASE_URL = "http://localhost:8080";
+
     private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter VNPAY_TIME_FMT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
@@ -70,7 +72,7 @@ public class PaymentService {
     }
 
     @Transactional
-    public PaymentCreateResponse createMomoTopUp(String email, BigDecimal amount, String description) {
+    public PaymentCreateResponse createMomoTopUp(String email, BigDecimal amount, String description, HttpServletRequest request) {
         PaymentProperties.Momo momo = paymentProperties.getMomo();
         ensureConfigured(momo.isEnabled(), "MoMo");
         String partnerCode = requireTrimmed(momo.getPartnerCode(), "MoMo partnerCode");
@@ -109,8 +111,9 @@ public class PaymentService {
                 .description(description)
                 .build());
 
-        String redirectUrl = paymentProperties.getBackendBaseUrl() + "/api/payments/callback/momo/return";
-        String ipnUrl = paymentProperties.getBackendBaseUrl() + "/api/payments/callback/momo/ipn";
+        String callbackBaseUrl = resolveCallbackBaseUrl(request);
+        String redirectUrl = callbackBaseUrl + "/api/payments/callback/momo/return";
+        String ipnUrl = callbackBaseUrl + "/api/payments/callback/momo/ipn";
         String orderInfo = "Top up SmartParking user " + user.getId();
         String extraData = Objects.toString(momo.getExtraData(), "");
 
@@ -232,7 +235,8 @@ public class PaymentService {
                 .description(description)
                 .build());
 
-        String returnUrl = paymentProperties.getBackendBaseUrl() + "/api/payments/callback/vnpay/return";
+        String callbackBaseUrl = resolveCallbackBaseUrl(request);
+        String returnUrl = callbackBaseUrl + "/api/payments/callback/vnpay/return";
         String ipAddr = resolveClientIp(request);
         LocalDateTime now = LocalDateTime.now(VN_ZONE);
         LocalDateTime expire = now.plusMinutes(Math.max(1, vnpay.getExpireMinutes()));
@@ -493,8 +497,8 @@ public class PaymentService {
         return new PaymentCallbackResult("VNPAY", txnRef, "success", "OK");
     }
 
-    public String buildFrontendRedirectUrl(PaymentCallbackResult result) {
-        String base = normalizeUrl(frontendBaseUrl, frontendDashboardPath);
+    public String buildFrontendRedirectUrl(PaymentCallbackResult result, HttpServletRequest request) {
+        String base = normalizeUrl(rewriteLocalhostToRequestHost(frontendBaseUrl, request), frontendDashboardPath);
         String msg = result.message() != null ? result.message() : "";
 
         return base
@@ -503,6 +507,145 @@ public class PaymentService {
                 + "&provider=" + UrlUtils.encode(result.provider())
                 + "&orderId=" + UrlUtils.encode(result.orderId() != null ? result.orderId() : "")
                 + "&message=" + UrlUtils.encode(msg);
+    }
+
+    private String resolveCallbackBaseUrl(HttpServletRequest request) {
+        String configured = normalizeBaseUrl(trimToNull(paymentProperties.getBackendBaseUrl()));
+        if (configured != null && !isDefaultLocalhost(configured)) {
+            return configured;
+        }
+
+        String derived = normalizeBaseUrl(deriveBaseUrlFromRequest(request));
+        if (derived != null && !derived.isBlank() && !isDefaultLocalhost(derived)) {
+            return derived;
+        }
+
+        return configured != null ? configured : DEFAULT_BACKEND_BASE_URL;
+    }
+
+    private static boolean isDefaultLocalhost(String baseUrl) {
+        if (baseUrl == null) {
+            return true;
+        }
+        String normalized = normalizeBaseUrl(baseUrl);
+        if (normalized == null) {
+            return true;
+        }
+        return DEFAULT_BACKEND_BASE_URL.equalsIgnoreCase(normalized);
+    }
+
+    private static String deriveBaseUrlFromRequest(HttpServletRequest request) {
+        if (request == null) {
+            return null;
+        }
+
+        String proto = firstHeaderValue(request, "X-Forwarded-Proto");
+        if (proto == null || proto.isBlank()) {
+            proto = request.getScheme();
+        }
+
+        String host = firstHeaderValue(request, "X-Forwarded-Host");
+        if (host == null || host.isBlank()) {
+            host = firstHeaderValue(request, "Host");
+        }
+        if (host == null || host.isBlank()) {
+            host = request.getServerName();
+            int port = request.getServerPort();
+            boolean defaultPort = ("http".equalsIgnoreCase(proto) && port == 80)
+                    || ("https".equalsIgnoreCase(proto) && port == 443);
+            if (!defaultPort && port > 0) {
+                host = host + ":" + port;
+            }
+        }
+
+        if (host == null || host.isBlank()) {
+            return null;
+        }
+        // Handle multiple forwarded hosts: "a,b" -> first
+        if (host.contains(",")) {
+            host = host.split(",")[0].trim();
+        }
+
+        return proto + "://" + host;
+    }
+
+    private static String rewriteLocalhostToRequestHost(String url, HttpServletRequest request) {
+        String u = trimToNull(url);
+        if (u == null) {
+            return url;
+        }
+        if (!(u.startsWith("http://localhost") || u.startsWith("http://127.0.0.1")
+                || u.startsWith("https://localhost") || u.startsWith("https://127.0.0.1"))) {
+            return url;
+        }
+
+        String reqBase = deriveBaseUrlFromRequest(request);
+        if (reqBase == null || reqBase.isBlank()) {
+            return url;
+        }
+
+        try {
+            URI original = URI.create(u);
+            URI requestBase = URI.create(reqBase);
+
+            // Keep original scheme + port of frontend URL if specified.
+            String scheme = original.getScheme() != null ? original.getScheme() : requestBase.getScheme();
+            String host = requestBase.getHost();
+            int port = original.getPort();
+
+            if (host == null || host.isBlank()) {
+                return url;
+            }
+
+            URI rebuilt = new URI(
+                    scheme,
+                    original.getUserInfo(),
+                    host,
+                    port,
+                    original.getPath(),
+                    original.getQuery(),
+                    original.getFragment());
+            return rebuilt.toString();
+        } catch (Exception e) {
+            return url;
+        }
+    }
+
+    private static String firstHeaderValue(HttpServletRequest request, String name) {
+        if (request == null || name == null) {
+            return null;
+        }
+        String value = request.getHeader(name);
+        if (value == null) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private static String normalizeBaseUrl(String url) {
+        String u = trimToNull(url);
+        if (u == null) {
+            return null;
+        }
+        while (u.endsWith("/")) {
+            u = u.substring(0, u.length() - 1);
+        }
+        return u;
+    }
+
+    private static String normalizeUrl(String baseUrl, String path) {
+        String base = normalizeBaseUrl(baseUrl);
+        String p = path == null ? "" : path.trim();
+        if (base == null) {
+            base = "";
+        }
+        if (p.isEmpty()) {
+            return base;
+        }
+        if (!p.startsWith("/")) {
+            p = "/" + p;
+        }
+        return base + p;
     }
 
     @Transactional(readOnly = true)
@@ -706,18 +849,6 @@ public class PaymentService {
                 .sorted(Comparator.comparing(Map.Entry::getKey))
                 .map(e -> e.getKey() + "=" + Objects.toString(e.getValue(), ""))
                 .collect(Collectors.joining("&"));
-    }
-
-    private static String normalizeUrl(String base, String path) {
-        String b = base != null ? base.trim() : "";
-        String p = path != null ? path.trim() : "";
-        if (b.endsWith("/") && p.startsWith("/")) {
-            return b.substring(0, b.length() - 1) + p;
-        }
-        if (!b.endsWith("/") && !p.isBlank() && !p.startsWith("/")) {
-            return b + "/" + p;
-        }
-        return b + p;
     }
 
     private static String enrichMomoConfigError(String message, String redirectUrl, String ipnUrl) {

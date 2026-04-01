@@ -4,6 +4,8 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+import com.parking.smartparking.config.DotenvSupport;
+
 /**
  * Entry point của Ứng dụng Spring Boot
  *
@@ -15,6 +17,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class SmartParkingBackendApplication {
 
     public static void main(String[] args) {
+        DotenvSupport.loadLocalDotenvIfPresent();
         SpringApplication.run(SmartParkingBackendApplication.class, args);
     }
 

@@ -20,9 +20,11 @@ import com.parking.smartparking.repository.PasswordResetTokenRepository;
 import com.parking.smartparking.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @SuppressWarnings("null")
 public class PasswordResetService {
 
@@ -95,6 +97,7 @@ public class PasswordResetService {
 
         JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
         if (mailSender == null) {
+            log.warn("Mail enabled but JavaMailSender is not available; check spring.mail.* configuration");
             return;
         }
 
@@ -105,8 +108,9 @@ public class PasswordResetService {
             message.setSubject("[SmartParking] Reset mật khẩu");
             message.setText(renderResetMailText(user, rawToken));
             mailSender.send(message);
-        } catch (MailException ignored) {
+        } catch (MailException e) {
             // Best-effort: do not fail forgot-password flow on mail issues.
+            log.warn("Failed to send reset-password email to {}: {}", to, e.getMessage());
         }
     }
 

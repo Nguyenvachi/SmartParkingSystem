@@ -89,6 +89,7 @@ public class InvoiceService {
 
     private void trySendInvoiceEmail(Invoice invoice) {
         if (!mailEnabled) {
+            log.debug("Invoice email skipped: app.mail.enabled=false");
             return;
         }
         if (invoice == null) {
@@ -102,6 +103,9 @@ public class InvoiceService {
         if (to.isBlank()) {
             invoice.setEmailSendError("Không có email người nhận.");
             invoiceRepository.save(invoice);
+            log.warn("Invoice email skipped: missing recipient email | invoiceId={} | bookingId={}",
+                    invoice.getId(),
+                    invoice.getBooking() != null ? invoice.getBooking().getId() : null);
             return;
         }
 
@@ -116,6 +120,7 @@ public class InvoiceService {
             if (mailSender == null) {
                 invoice.setEmailSendError("Mail sender chưa được cấu hình.");
                 invoiceRepository.save(invoice);
+                log.warn("Mail enabled but JavaMailSender is not available; check spring.mail.* configuration");
                 return;
             }
             mailSender.send(message);
