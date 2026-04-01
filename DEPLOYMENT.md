@@ -70,6 +70,9 @@ Mẫu `.env` tối thiểu:
 # Public base URL của frontend (dùng cho link redirect/reset password)
 APP_FRONTEND_BASE_URL=http://smartparking.id.vn
 
+# Lưu ý: `.env` của Docker Compose chỉ hỗ trợ `KEY=VALUE`.
+# Không đặt các placeholder dạng `${VAR:}` trong `.env` (Compose sẽ báo lỗi).
+
 # Payment gateways (MoMo/VNPay)
 # Base URL public (HTTPS) của backend để gateway gọi callback/IPN.
 # Khi test local:
@@ -77,6 +80,17 @@ APP_FRONTEND_BASE_URL=http://smartparking.id.vn
 # - Điện thoại thật cùng LAN: dùng `http://<LAN_IP_OF_YOUR_PC>:8080`
 # - Nếu gateway cần gọi IPN từ internet: dùng ngrok/cloudflared (HTTPS) và set vào đây.
 APP_PAYMENT_BACKEND_BASE_URL=https://api.smartparking.id.vn
+
+# Bật/tắt gateway (mặc định false). Khi bật cần set key tương ứng.
+APP_PAYMENT_MOMO_ENABLED=false
+# APP_PAYMENT_MOMO_PARTNER_CODE=
+# APP_PAYMENT_MOMO_ACCESS_KEY=
+# APP_PAYMENT_MOMO_SECRET_KEY=
+# APP_PAYMENT_MOMO_ALLOW_UNSAFE_RETURN_SUCCESS=false
+
+APP_PAYMENT_VNPAY_ENABLED=false
+# APP_PAYMENT_VNPAY_TMN_CODE=
+# APP_PAYMENT_VNPAY_HASH_SECRET=
 
 # Email (Invoice + Forgot/Reset password)
 # Bật gửi mail best-effort (không làm fail API nếu SMTP lỗi).
@@ -110,14 +124,20 @@ APP_PASSWORD_RESET_EXPOSE_TOKEN=false
 
 # (Tuỳ chọn) đổi port public
 FRONTEND_PORT=80
-BACKEND_PORT=8080
-PHPMYADMIN_PORT=8081
+
+# Khuyến nghị (an toàn hơn): chỉ expose frontend ra public,
+# còn backend/phpmyadmin/mysql/mailpit bind vào localhost.
+# Frontend Nginx đã proxy sẵn /api và /ws tới backend.
+BACKEND_PORT=127.0.0.1:8080
+PHPMYADMIN_PORT=127.0.0.1:8081
+MYSQL_PORT=127.0.0.1:3306
+MAILPIT_SMTP_PORT=127.0.0.1:1025
+MAILPIT_WEB_PORT=127.0.0.1:8025
 
 # (Tuỳ chọn) database
 MYSQL_ROOT_PASSWORD=root
 MYSQL_USERNAME=root
 MYSQL_PASSWORD=root
-MYSQL_PORT=3306
 
 # (Tuỳ chọn) OAuth2 Google
 # GOOGLE_CLIENT_ID=
@@ -127,6 +147,8 @@ MYSQL_PORT=3306
 # APP_JWT_SECRET=... (>= 32 chars)
 # APP_QR_SECRET=...
 ```
+
+Khuyến nghị: khi deploy VPS, không dùng `backend/application-secrets.properties` (dễ lộ secrets). Hãy set qua `.env`/environment variables.
 
 Nếu bạn muốn dùng HTTPS (khuyến nghị), bạn sẽ cần reverse proxy (Nginx/Caddy) + SSL (Let’s Encrypt). Phần này không bắt buộc theo TODO hiện tại.
 
@@ -155,8 +177,8 @@ Nếu VPS bật UFW:
 ```bash
 ufw allow 22/tcp
 ufw allow 80/tcp
-ufw allow 8080/tcp
-ufw allow 8081/tcp
+## Nếu bạn bind backend/phpmyadmin/mysql/mailpit về localhost (khuyến nghị),
+## KHÔNG cần mở 8080/8081/3306/8025 ra public.
 ufw enable
 ufw status
 ```
@@ -164,8 +186,10 @@ ufw status
 ## 7) URL kiểm tra
 
 - Frontend: `http://<domain-or-ip>/` (nếu `FRONTEND_PORT=80`) hoặc `http://<domain-or-ip>:3000/`
-- Backend API: `http://<domain-or-ip>:8080/api`
-- phpMyAdmin: `http://<domain-or-ip>:8081/`
+- API (qua frontend proxy): `http://<domain-or-ip>/api`
+- WebSocket (qua frontend proxy): `http://<domain-or-ip>/ws`
+- Backend API trực tiếp: `http://<domain-or-ip>:8080/api` (chỉ khi bạn expose port 8080)
+- phpMyAdmin: `http://<domain-or-ip>:8081/` (chỉ khi bạn expose port 8081)
 
 ## Troubleshooting nhanh
 

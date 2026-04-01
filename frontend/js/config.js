@@ -26,6 +26,7 @@ const SMARTPARKING_CONFIG = (window && window.SMARTPARKING_CONFIG) ? window.SMAR
 // In local dev (npx serve), there is no proxy, so we fall back to backend :8080.
 const SAME_ORIGIN_API = `${window.location.origin}/api`;
 const SAME_ORIGIN_WS = `${window.location.origin}/ws`;
+const SAME_ORIGIN_OAUTH2 = `${window.location.origin}/oauth2/authorization/google`;
 
 const isLocalhost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const isLikelyServeDev = isLocalhost && String(window.location.port) === '3000';
@@ -47,7 +48,8 @@ const FRONTEND_DASHBOARD_URL = SMARTPARKING_CONFIG.FRONTEND_DASHBOARD_URL || `${
 
 // OAuth2 entrypoints on backend
 // const OAUTH2_GOOGLE_AUTH_URL = 'http://localhost:8080/oauth2/authorization/google';
-const OAUTH2_GOOGLE_AUTH_URL = SMARTPARKING_CONFIG.OAUTH2_GOOGLE_AUTH_URL || 'http://localhost:8080/oauth2/authorization/google';
+const OAUTH2_GOOGLE_AUTH_URL = SMARTPARKING_CONFIG.OAUTH2_GOOGLE_AUTH_URL
+	|| (isLikelyServeDev ? 'http://localhost:8080/oauth2/authorization/google' : SAME_ORIGIN_OAUTH2);
 
 // ===== PWA (optional / for mobile scoring) =====
 try {

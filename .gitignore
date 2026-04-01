@@ -1,5 +1,8 @@
 # Local environment secrets
 .env
 
+# Backend local secrets (do not commit)
+backend/application-secrets.properties
+
 # Optional local-only files
 *.log
