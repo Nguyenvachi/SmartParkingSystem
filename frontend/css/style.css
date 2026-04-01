@@ -1,0 +1,630 @@
+/**
+ * CSS cho Smart Parking Dashboard
+ * Tính năng #5 - Real-time Map Update (UI)
+ *
+ * Note (Mar 2026): File đã được tinh gọn theo usage hiện tại.
+ * - Giữ nguyên JS/APIs, chỉ tập trung theme-minimal và các selector đang được dùng.
+ */
+
+:root {
+    --brand-ink: #0c2340;
+    --brand-ink-soft: #314a67;
+    --brand-accent: #0f766e;
+    --brand-accent-strong: #115e59;
+    --brand-card: rgba(255, 255, 255, 0.78);
+    --brand-line: rgba(12, 35, 64, 0.1);
+    --brand-shadow: 0 24px 70px rgba(16, 41, 63, 0.16);
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: 'Manrope', sans-serif;
+    color: var(--brand-ink);
+    min-height: 100vh;
+    background: #f6f7fb;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.navbar-brand,
+.landing-title {
+    font-family: 'Sora', sans-serif;
+}
+
+a {
+    color: inherit;
+}
+
+.landing-page,
+.auth-page,
+.dashboard-page {
+    position: relative;
+    overflow-x: hidden;
+}
+
+.landing-shell,
+.auth-shell,
+.dashboard-shell,
+.dashboard-navbar {
+    position: relative;
+    z-index: 1;
+}
+
+/* ============================================
+   Landing/Auth shared components
+   ============================================ */
+
+.eyebrow-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 1rem;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--brand-ink);
+    font-size: 0.84rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    border: 1px solid var(--brand-line);
+}
+
+.btn-brand {
+    background: linear-gradient(135deg, var(--brand-accent) 0%, #0b8c82 100%);
+    border: 0;
+    color: #fff;
+    box-shadow: none;
+}
+
+.btn-brand:hover,
+.btn-brand:focus {
+    color: #fff;
+    background: linear-gradient(135deg, #0d675f 0%, #08786f 100%);
+}
+
+.btn-ghost {
+    background: #fff;
+    border: 1px solid var(--brand-line);
+    color: var(--brand-ink);
+}
+
+.btn-ghost:hover,
+.btn-ghost:focus {
+    background: #fff;
+    color: var(--brand-ink);
+}
+
+.landing-title {
+    margin: 1.25rem 0 1rem;
+    font-size: clamp(2rem, 4vw, 3.2rem);
+    line-height: 1.05;
+}
+
+.landing-text {
+    color: var(--brand-ink-soft);
+    font-size: 1.02rem;
+    line-height: 1.8;
+}
+
+.landing-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin: 1.75rem 0 2rem;
+}
+
+.landing-footer {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 1rem 0 0;
+    color: var(--brand-ink-soft);
+}
+
+/* Auth form bits (login/register) */
+.auth-card {
+    background: #ffffff;
+}
+
+.auth-input,
+.auth-card .form-control,
+.auth-card .form-select,
+.dashboard-form-card .form-control,
+.dashboard-form-card .form-select {
+    border-radius: 16px;
+    border-color: rgba(12, 35, 64, 0.12);
+}
+
+.auth-divider {
+    position: relative;
+    text-align: center;
+    margin: 1.2rem 0 1rem;
+}
+
+.auth-divider::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: rgba(12, 35, 64, 0.12);
+}
+
+.auth-divider span {
+    position: relative;
+    z-index: 1;
+    display: inline-block;
+    padding: 0 0.9rem;
+    background: #ffffff;
+    color: var(--brand-ink-soft);
+}
+
+.auth-google-btn {
+    border-radius: 16px;
+    padding: 0.9rem 1rem;
+}
+
+/* ============================================
+   Dashboard navbar + cards
+   ============================================ */
+
+.dashboard-navbar {
+    padding-top: 1rem;
+}
+
+.dashboard-navbar-inner {
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 14px;
+    padding: 0.9rem 1.1rem;
+    box-shadow: none;
+}
+
+.dashboard-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.85rem;
+    color: #fff;
+    text-decoration: none;
+}
+
+.dashboard-brand small {
+    display: block;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.74rem;
+    font-weight: 600;
+}
+
+.brand-mark {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, var(--brand-accent) 0%, #0b8c82 100%);
+    font-size: 1.25rem;
+}
+
+.dashboard-navbar .navbar-nav .nav-link {
+    color: rgba(255, 255, 255, 0.78);
+    font-weight: 600;
+}
+
+.dashboard-navbar .navbar-nav .nav-link.active,
+.dashboard-navbar .navbar-nav .nav-link:hover {
+    color: #fff;
+}
+
+.dashboard-userbar {
+    gap: 1rem;
+}
+
+.userbar-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.userbar-label {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.85rem;
+}
+
+.dashboard-card {
+    border-radius: 16px;
+    border: 1px solid var(--brand-line);
+    background: #ffffff;
+    box-shadow: var(--brand-shadow);
+}
+
+.dashboard-card-header {
+    background: transparent;
+    border-bottom: 1px solid var(--brand-line);
+}
+
+.dashboard-map-body {
+    background: #ffffff;
+}
+
+.legend-group .badge {
+    padding: 0.6rem 0.8rem;
+}
+
+.dashboard-side-header {
+    border-bottom: 1px solid var(--brand-line);
+}
+
+.dashboard-side-body {
+    background: #ffffff;
+}
+
+.side-section-block,
+.wallet-summary-card,
+.membership-card,
+.dashboard-form-card {
+    border-radius: 16px;
+}
+
+.side-section-block,
+.dashboard-form-card {
+    padding: 1rem;
+    background: #ffffff;
+    border: 1px solid rgba(12, 35, 64, 0.08);
+}
+
+.wallet-summary-card {
+    background: #0f172a;
+    color: #ffffff;
+}
+
+.wallet-summary-card .text-muted,
+.wallet-summary-card .small,
+.wallet-summary-card #membershipSummaryText {
+    color: rgba(255, 255, 255, 0.76) !important;
+}
+
+.membership-card {
+    border-color: rgba(12, 35, 64, 0.08) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.admin-console-card {
+    overflow: hidden;
+}
+
+.admin-console-header {
+    background: #0f172a !important;
+}
+
+.admin-console-body {
+    background: #ffffff;
+}
+
+/* ============================================
+   Parking slot styles
+   ============================================ */
+
+.parking-slot {
+    width: 124px;
+    height: 104px;
+    border: 1px solid rgba(12, 35, 64, 0.08);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+    font-weight: 500;
+    box-shadow: none;
+}
+
+.parking-slot:hover {
+    transform: translateY(-2px);
+}
+
+.slot-name {
+    font-size: 1rem;
+    font-weight: 800;
+    font-family: 'Sora', sans-serif;
+    margin-bottom: 0.3rem;
+}
+
+.slot-status {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.slot-available {
+    background: linear-gradient(135deg, #d8f6ed 0%, #bcebdc 100%);
+    border-color: rgba(22, 163, 74, 0.32);
+    color: #155724;
+}
+
+.slot-available:hover {
+    background: linear-gradient(135deg, #ccf4e5 0%, #afe3d1 100%);
+    border-color: rgba(22, 163, 74, 0.42);
+}
+
+.slot-reserved {
+    background: linear-gradient(135deg, #fff2c9 0%, #ffe0a0 100%);
+    border-color: rgba(245, 158, 11, 0.38);
+    color: #856404;
+    cursor: not-allowed;
+}
+
+.slot-occupied {
+    background: linear-gradient(135deg, #ffd9d9 0%, #ffbdbd 100%);
+    border-color: rgba(220, 53, 69, 0.35);
+    color: #721c24;
+    cursor: not-allowed;
+}
+
+.slot-maintenance {
+    background: linear-gradient(135deg, #edf0f4 0%, #dde3ea 100%);
+    border-color: rgba(108, 117, 125, 0.28);
+    color: #383d41;
+    cursor: not-allowed;
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.parking-slot.updating {
+    animation: pulse 1s ease-in-out;
+}
+
+.parking-slot.slot-selected {
+    outline: 3px solid #0d6efd;
+    outline-offset: 2px;
+    transform: scale(1.06);
+}
+
+/* ============================================
+   Booking/QR/UI helpers
+   ============================================ */
+
+.booking-card {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    font-size: 0.82rem;
+    transition: box-shadow 0.2s ease;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.78);
+}
+
+.booking-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.btn-xs {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    line-height: 1.4;
+}
+
+.qr-container {
+    width: 230px;
+    height: 230px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, #fdfefe 0%, #eef5f7 100%);
+    border-radius: 20px;
+    border: 2px dashed rgba(12, 35, 64, 0.18);
+}
+
+.qr-placeholder {
+    text-align: center;
+    color: #adb5bd;
+}
+
+#bookingHistoryList {
+    max-height: 420px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+#sidebarTabs .nav-link {
+    font-size: 0.85rem;
+    padding: 0.65rem 0.9rem;
+    border: 0;
+    color: var(--brand-ink-soft);
+}
+
+#sidebarTabs .nav-link.active {
+    background: transparent;
+    color: var(--brand-ink);
+    box-shadow: inset 0 -2px 0 var(--brand-accent);
+}
+
+.modal-content {
+    border: 0;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--brand-shadow);
+}
+
+.toast {
+    border-radius: 18px;
+}
+
+/* ============================================
+   Theme: minimal (used across pages)
+   ============================================ */
+
+.theme-minimal {
+    --brand-ink: #0f172a;
+    --brand-ink-soft: #475569;
+    --brand-accent: #0f766e;
+    --brand-accent-strong: #0f766e;
+    --brand-card: #ffffff;
+    --brand-line: rgba(15, 23, 42, 0.10);
+    --brand-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+
+    color: var(--brand-ink);
+    background: #f6f7fb;
+}
+
+.theme-minimal .dashboard-navbar {
+    padding-top: 0.75rem;
+}
+
+/* Minimal layout helpers for a more "system" look */
+.theme-minimal .app-topbar {
+    padding-top: 0.75rem;
+}
+
+.theme-minimal .app-shell {
+    padding-top: 1.25rem;
+}
+
+.theme-minimal .app-surface {
+    background: #ffffff;
+    border: 1px solid var(--brand-line);
+    border-radius: 18px;
+    box-shadow: var(--brand-shadow);
+}
+
+.theme-minimal .app-surface-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--brand-line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.theme-minimal .app-surface-body {
+    padding: 1.25rem;
+}
+
+.theme-minimal .module-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.9rem;
+}
+
+.theme-minimal .module-card {
+    border: 1px solid var(--brand-line);
+    border-radius: 16px;
+    background: #fff;
+    padding: 1rem;
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
+}
+
+.theme-minimal .module-card-title {
+    font-weight: 800;
+    margin-bottom: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.theme-minimal .module-card-title i {
+    color: var(--brand-accent);
+}
+
+.theme-minimal .module-card-desc {
+    color: var(--brand-ink-soft);
+    margin-bottom: 0;
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
+.theme-minimal .auth-layout {
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 1.25rem;
+}
+
+.theme-minimal .auth-panel {
+    border: 1px solid var(--brand-line);
+    border-radius: 18px;
+    background: #ffffff;
+    padding: 1.25rem;
+    box-shadow: var(--brand-shadow);
+}
+
+.theme-minimal .auth-panel h1 {
+    margin: 0 0 0.4rem;
+}
+
+.theme-minimal .auth-panel p {
+    margin: 0;
+    color: var(--brand-ink-soft);
+}
+
+.theme-minimal .auth-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.theme-minimal .auth-badges .badge {
+    border: 1px solid var(--brand-line);
+    background: #fff;
+    color: var(--brand-ink);
+    font-weight: 700;
+    padding: 0.55rem 0.7rem;
+}
+
+@media (max-width: 991.98px) {
+    .userbar-copy {
+        align-items: flex-start;
+    }
+
+    .theme-minimal .auth-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .theme-minimal .module-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .landing-actions {
+        flex-direction: column;
+    }
+
+    .landing-actions .btn,
+    .dashboard-userbar .btn {
+        width: 100%;
+    }
+
+    .landing-footer {
+        flex-direction: column;
+    }
+
+    .parking-slot {
+        width: 74px;
+        height: 74px;
+        border-radius: 14px;
+    }
+
+    .slot-name {
+        font-size: 0.82rem;
+    }
+
+    .slot-status {
+        font-size: 0.55rem;
+    }
+}
