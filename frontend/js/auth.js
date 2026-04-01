@@ -164,7 +164,7 @@ document.getElementById('googleLoginBtn')?.addEventListener('click', function (e
     window.location.assign(
         (typeof OAUTH2_GOOGLE_AUTH_URL !== 'undefined' && OAUTH2_GOOGLE_AUTH_URL)
             ? OAUTH2_GOOGLE_AUTH_URL
-            : 'http://localhost:8080/oauth2/authorization/google'
+            : `${window.location.origin}/oauth2/authorization/google`
     );
 });
 
