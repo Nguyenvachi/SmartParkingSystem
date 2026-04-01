@@ -1,12 +1,12 @@
 package com.parking.smartparking.service;
 
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -16,8 +16,8 @@ import com.parking.smartparking.controller.WebSocketController;
 import com.parking.smartparking.dto.request.ParkingSlotRequest;
 import com.parking.smartparking.dto.response.ParkingRecommendationResponse;
 import com.parking.smartparking.dto.response.ParkingSlotResponse;
-import com.parking.smartparking.entity.ParkingSlot;
 import com.parking.smartparking.entity.Booking;
+import com.parking.smartparking.entity.ParkingSlot;
 import com.parking.smartparking.entity.User;
 import com.parking.smartparking.repository.BookingRepository;
 import com.parking.smartparking.repository.ParkingSlotRepository;

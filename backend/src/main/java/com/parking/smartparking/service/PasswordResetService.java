@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ import com.parking.smartparking.entity.User;
 import com.parking.smartparking.repository.PasswordResetTokenRepository;
 import com.parking.smartparking.repository.UserRepository;
 
+import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -101,6 +103,23 @@ public class PasswordResetService {
             return;
         }
 
+        // Prefer HTML email; fallback to plain text if needed.
+        try {
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+            helper.setFrom(mailFrom);
+            helper.setTo(to);
+            helper.setSubject("[SmartParking] Reset mật khẩu");
+
+            String htmlContent = renderResetMailHtml(user, rawToken);
+            helper.setText(renderResetMailText(user, rawToken), htmlContent);
+
+            mailSender.send(mimeMessage);
+            return;
+        } catch (Exception e) {
+            log.warn("Failed to send HTML reset-password email to {}: {} ({})", to, e.getMessage(), e.getClass().getSimpleName());
+        }
+
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(mailFrom);
@@ -112,6 +131,88 @@ public class PasswordResetService {
             // Best-effort: do not fail forgot-password flow on mail issues.
             log.warn("Failed to send reset-password email to {}: {}", to, e.getMessage());
         }
+    }
+
+    private String renderResetMailHtml(User user, String rawToken) {
+        String email = user != null && user.getEmail() != null ? user.getEmail() : "";
+
+        String template = """
+                                <!doctype html>
+                                <html lang=\"vi\">
+                                    <head>
+                                        <meta charset=\"utf-8\" />
+                                        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+                                        <title>Reset mật khẩu</title>
+                                    </head>
+                                    <body style=\"margin:0;padding:0;background:#f6f9fc;\">
+                                        <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background:#f6f9fc;padding:24px 12px;\">
+                                            <tr>
+                                                <td align=\"center\">
+                                                    <table role=\"presentation\" width=\"600\" cellspacing=\"0\" cellpadding=\"0\" style=\"max-width:600px;width:100%;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;\">
+                                                        <tr>
+                                                            <td style=\"padding:20px 22px;background:#0b5fff;\">
+                                                                <div style=\"font-family:Arial,Helvetica,sans-serif;font-size:18px;line-height:22px;font-weight:700;color:#ffffff;\">Hệ thống Smart Parking</div>
+                                                                <div style=\"font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:16px;color:#dbeafe;margin-top:4px;\">Yêu cầu đặt lại mật khẩu</div>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td style=\"padding:22px;\">
+                                                                <div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#111827;\">
+                                                                    Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản:
+                                                                    <span style=\"font-weight:700;\">{{EMAIL}}</span>
+                                                                </div>
+
+                                                                <div style=\"margin-top:18px;padding:16px;border:1px dashed #93c5fd;background:#eff6ff;border-radius:10px;\">
+                                                                    <div style=\"font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:16px;color:#1d4ed8;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;\">Mã Token</div>
+                                                                    <div style=\"font-family:Arial,Helvetica,sans-serif;font-size:22px;line-height:28px;color:#111827;font-weight:800;text-align:center;margin-top:10px;word-break:break-all;\">{{TOKEN}}</div>
+                                                                </div>
+
+                                                                <div style=\"font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#374151;margin-top:14px;\">
+                                                                    Token này sẽ hết hạn sau <span style=\"font-weight:700;\">{{EXPIRY_MINUTES}} phút</span>.
+                                                                </div>
+
+                                                                <div style=\"margin-top:16px;padding:12px 14px;border-left:4px solid #f59e0b;background:#fffbeb;border-radius:8px;\">
+                                                                    <div style=\"font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#92400e;\">
+                                                                        Lưu ý bảo mật: Không chia sẻ token với bất kỳ ai. Nếu bạn không yêu cầu reset mật khẩu, vui lòng bỏ qua email này.
+                                                                    </div>
+                                                                </div>
+
+                                                                <div style=\"font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:16px;color:#6b7280;margin-top:20px;\">
+                                                                    Mở app SmartParking → Quên mật khẩu → Nhập token để đặt mật khẩu mới.
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td style=\"padding:14px 22px;background:#f9fafb;border-top:1px solid #e5e7eb;\">
+                                                                <div style=\"font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:15px;color:#6b7280;\">
+                                                                    Email này được gửi tự động từ hệ thống Smart Parking.
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </body>
+                                </html>
+                                """;
+
+        return template
+                .replace("{{EMAIL}}", escapeHtml(email))
+                .replace("{{TOKEN}}", escapeHtml(rawToken))
+                .replace("{{EXPIRY_MINUTES}}", String.valueOf(expiryMinutes));
+    }
+
+    private String escapeHtml(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
     }
 
     private String renderResetMailText(User user, String rawToken) {
