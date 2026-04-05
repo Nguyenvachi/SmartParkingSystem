@@ -510,28 +510,78 @@ public class PaymentService {
     }
 
     private String resolveCallbackBaseUrl(HttpServletRequest request) {
-        String configured = normalizeBaseUrl(trimToNull(paymentProperties.getBackendBaseUrl()));
-        if (configured != null && !isDefaultLocalhost(configured)) {
+        String configured = normalizeCallbackBaseUrl(paymentProperties.getBackendBaseUrl());
+        if (configured != null && !isLocalhostLikeBaseUrl(configured)) {
             return configured;
         }
 
-        String derived = normalizeBaseUrl(deriveBaseUrlFromRequest(request));
-        if (derived != null && !derived.isBlank() && !isDefaultLocalhost(derived)) {
+        String derived = normalizeCallbackBaseUrl(deriveBaseUrlFromRequest(request));
+        if (derived != null && !derived.isBlank() && !isLocalhostLikeBaseUrl(derived)) {
             return derived;
         }
 
+        // Local dev fallback: allow localhost when we cannot derive a better public URL.
         return configured != null ? configured : DEFAULT_BACKEND_BASE_URL;
     }
 
-    private static boolean isDefaultLocalhost(String baseUrl) {
-        if (baseUrl == null) {
+    private static String normalizeCallbackBaseUrl(String url) {
+        String u = normalizeBaseUrl(trimToNull(url));
+        if (u == null) {
+            return null;
+        }
+        // Ensure we only keep scheme://host[:port] (some users mistakenly set .../api)
+        try {
+            URI uri = URI.create(u);
+            if (uri.getScheme() == null || uri.getHost() == null) {
+                return u;
+            }
+            URI rebuilt = new URI(
+                    uri.getScheme(),
+                    uri.getUserInfo(),
+                    uri.getHost(),
+                    uri.getPort(),
+                    null,
+                    null,
+                    null);
+            return normalizeBaseUrl(rebuilt.toString());
+        } catch (IllegalArgumentException | java.net.URISyntaxException e) {
+            return u;
+        }
+    }
+
+    private static boolean isLocalhostLikeBaseUrl(String baseUrl) {
+        String u = normalizeBaseUrl(trimToNull(baseUrl));
+        if (u == null) {
             return true;
         }
-        String normalized = normalizeBaseUrl(baseUrl);
-        if (normalized == null) {
-            return true;
+        try {
+            URI uri = URI.create(u);
+            String host = uri.getHost();
+            if (host == null || host.isBlank()) {
+                // Best-effort fallback
+                String authority = uri.getAuthority();
+                if (authority != null) {
+                    String auth = authority;
+                    int at = auth.lastIndexOf('@');
+                    if (at >= 0) {
+                        auth = auth.substring(at + 1);
+                    }
+                    int colon = auth.indexOf(':');
+                    host = (colon >= 0) ? auth.substring(0, colon) : auth;
+                }
+            }
+            if (host == null || host.isBlank()) {
+                return false;
+            }
+            String h = host.trim().toLowerCase();
+            return "localhost".equals(h)
+                    || "127.0.0.1".equals(h)
+                    || "0.0.0.0".equals(h)
+                    || "::1".equals(h);
+        } catch (IllegalArgumentException e) {
+            String lower = u.toLowerCase();
+            return lower.contains("localhost") || lower.contains("127.0.0.1");
         }
-        return DEFAULT_BACKEND_BASE_URL.equalsIgnoreCase(normalized);
     }
 
     private static String deriveBaseUrlFromRequest(HttpServletRequest request) {
@@ -588,10 +638,11 @@ public class PaymentService {
             URI original = URI.create(u);
             URI requestBase = URI.create(reqBase);
 
-            // Keep original scheme + port of frontend URL if specified.
-            String scheme = original.getScheme() != null ? original.getScheme() : requestBase.getScheme();
+            // If frontend base URL is localhost, prefer the request's public scheme/host.
+            // Avoid leaking local dev ports (e.g. :3000) into production redirects.
+            String scheme = requestBase.getScheme() != null ? requestBase.getScheme() : original.getScheme();
             String host = requestBase.getHost();
-            int port = original.getPort();
+            int port = requestBase.getPort();
 
             if (host == null || host.isBlank()) {
                 return url;
@@ -606,7 +657,7 @@ public class PaymentService {
                     original.getQuery(),
                     original.getFragment());
             return rebuilt.toString();
-        } catch (Exception e) {
+        } catch (IllegalArgumentException | java.net.URISyntaxException e) {
             return url;
         }
     }

@@ -277,6 +277,17 @@ ufw status
 
 ## Troubleshooting nhanh
 
+- `docker-compose up -d` báo lỗi `KeyError: 'ContainerConfig'`:
+  - Bạn đang dùng **docker-compose v1 (Python)** (thường là 1.29.x) nhưng Docker Engine trên VPS đã mới → không tương thích.
+  - Cách xử lý khuyến nghị: cài **Docker Compose V2 plugin** và dùng lệnh `docker compose ...` (không có dấu gạch).
+    - Kiểm tra: `docker compose version` (phải ra v2.x)
+    - Ubuntu (nếu đã cài Docker từ repo Docker): `apt update && apt install -y docker-compose-plugin`
+    - Sau đó chạy lại: `docker compose up -d --build`
+
+- `docker compose up -d --build` báo `unknown shorthand flag: 'd' in -d`:
+  - Thường là VPS **chưa có Docker Compose V2 plugin** hoặc Docker cài sai nguồn.
+  - Làm theo mục cài Docker + Compose plugin ở trên, rồi kiểm tra lại bằng `docker compose version`.
+
 - Không vào được web (ERR_CONNECTION_REFUSED):
   - Kiểm tra firewall/security group (nhà VPS) đã mở **80/443** chưa.
   - Trên VPS chạy `docker compose ps` để xem service nào đang publish port:
