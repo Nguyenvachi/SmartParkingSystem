@@ -67,11 +67,13 @@ public class PaymentController {
     @GetMapping("/callback/momo/return")
     public void momoReturn(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Map<String, String> params = flattenParams(request);
-        log.info("[PAYMENT] MoMo return callback | orderId={} | resultCode={} | from={} | host={} | xfProto={} | xfHost={}",
+        log.info("[PAYMENT] MoMo return callback | orderId={} | resultCode={} | from={} | host={} | origin={} | referer={} | xfProto={} | xfHost={}",
                 params.get("orderId"),
                 params.get("resultCode"),
                 request.getRemoteAddr(),
                 request.getHeader("Host"),
+                request.getHeader("Origin"),
+                request.getHeader("Referer"),
                 request.getHeader("X-Forwarded-Proto"),
                 request.getHeader("X-Forwarded-Host"));
         PaymentCallbackResult result = paymentService.handleMomoCallback(params, true);
@@ -104,11 +106,13 @@ public class PaymentController {
     @GetMapping("/callback/vnpay/return")
     public void vnpayReturn(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Map<String, String> params = flattenParams(request);
-        log.info("[PAYMENT] VNPay return callback | vnp_TxnRef={} | vnp_ResponseCode={} | from={} | host={} | xfProto={} | xfHost={}",
+        log.info("[PAYMENT] VNPay return callback | vnp_TxnRef={} | vnp_ResponseCode={} | from={} | host={} | origin={} | referer={} | xfProto={} | xfHost={}",
                 params.get("vnp_TxnRef"),
                 params.get("vnp_ResponseCode"),
                 request.getRemoteAddr(),
                 request.getHeader("Host"),
+                request.getHeader("Origin"),
+                request.getHeader("Referer"),
                 request.getHeader("X-Forwarded-Proto"),
                 request.getHeader("X-Forwarded-Host"));
         PaymentCallbackResult result = paymentService.handleVnpayReturn(params);
