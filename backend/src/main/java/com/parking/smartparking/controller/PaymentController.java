@@ -25,10 +25,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequestMapping("/api/payments")
 @RequiredArgsConstructor
+@Slf4j
 public class PaymentController {
 
     private final PaymentService paymentService;
@@ -64,7 +66,10 @@ public class PaymentController {
     // =====================
     @GetMapping("/callback/momo/return")
     public void momoReturn(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        PaymentCallbackResult result = paymentService.handleMomoCallback(flattenParams(request), true);
+        Map<String, String> params = flattenParams(request);
+        log.info("[PAYMENT] MoMo return callback | orderId={} | resultCode={} | from={} | xfProto={} | xfHost={}",
+                params.get("orderId"), params.get("resultCode"), request.getRemoteAddr(), request.getHeader("X-Forwarded-Proto"), request.getHeader("X-Forwarded-Host"));
+        PaymentCallbackResult result = paymentService.handleMomoCallback(params, true);
         response.sendRedirect(paymentService.buildFrontendRedirectUrl(result, request));
     }
 
@@ -80,6 +85,7 @@ public class PaymentController {
             }
         }
 
+        log.info("[PAYMENT] MoMo IPN callback | orderId={} | resultCode={}", fields.get("orderId"), fields.get("resultCode"));
         paymentService.handleMomoCallback(fields, false);
         // MoMo expects a 200 response; body format varies by API version.
         return ResponseEntity.ok(Map.of("status", "OK"));
@@ -90,13 +96,18 @@ public class PaymentController {
     // =====================
     @GetMapping("/callback/vnpay/return")
     public void vnpayReturn(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        PaymentCallbackResult result = paymentService.handleVnpayReturn(flattenParams(request));
+        Map<String, String> params = flattenParams(request);
+        log.info("[PAYMENT] VNPay return callback | vnp_TxnRef={} | vnp_ResponseCode={} | from={} | xfProto={} | xfHost={}",
+                params.get("vnp_TxnRef"), params.get("vnp_ResponseCode"), request.getRemoteAddr(), request.getHeader("X-Forwarded-Proto"), request.getHeader("X-Forwarded-Host"));
+        PaymentCallbackResult result = paymentService.handleVnpayReturn(params);
         response.sendRedirect(paymentService.buildFrontendRedirectUrl(result, request));
     }
 
     @GetMapping("/callback/vnpay/ipn")
     public ResponseEntity<Map<String, Object>> vnpayIpn(HttpServletRequest request) {
-        paymentService.handleVnpayReturn(flattenParams(request));
+        Map<String, String> params = flattenParams(request);
+        log.info("[PAYMENT] VNPay IPN callback | vnp_TxnRef={} | vnp_ResponseCode={}", params.get("vnp_TxnRef"), params.get("vnp_ResponseCode"));
+        paymentService.handleVnpayReturn(params);
         return ResponseEntity.ok(Map.of("RspCode", "00", "Message", "OK"));
     }
 

@@ -114,6 +114,7 @@ public class PaymentService {
         String callbackBaseUrl = resolveCallbackBaseUrl(request);
         String redirectUrl = callbackBaseUrl + "/api/payments/callback/momo/return";
         String ipnUrl = callbackBaseUrl + "/api/payments/callback/momo/ipn";
+        log.info("[PAYMENT] MoMo create | orderId={} | callbackBaseUrl={} | redirectUrl={} | ipnUrl={}", orderId, callbackBaseUrl, redirectUrl, ipnUrl);
         String orderInfo = "Top up SmartParking user " + user.getId();
         String extraData = Objects.toString(momo.getExtraData(), "");
 
@@ -237,6 +238,7 @@ public class PaymentService {
 
         String callbackBaseUrl = resolveCallbackBaseUrl(request);
         String returnUrl = callbackBaseUrl + "/api/payments/callback/vnpay/return";
+        log.info("[PAYMENT] VNPay create | orderId={} | callbackBaseUrl={} | returnUrl={}", orderId, callbackBaseUrl, returnUrl);
         String ipAddr = resolveClientIp(request);
         LocalDateTime now = LocalDateTime.now(VN_ZONE);
         LocalDateTime expire = now.plusMinutes(Math.max(1, vnpay.getExpireMinutes()));
