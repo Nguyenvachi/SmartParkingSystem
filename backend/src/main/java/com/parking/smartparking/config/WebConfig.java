@@ -29,15 +29,23 @@ public class WebConfig implements WebMvcConfigurer {
     public void addCorsMappings(@NonNull CorsRegistry registry) {
         final String[] origins = parseAllowedOrigins(allowedOrigins);
 
+        // Payment gateway browser returns may originate from gateway domains (MoMo/VNPay hosted pages).
+        // Permit cross-origin calls for these callbacks WITHOUT credentials.
+        registry.addMapping("/api/payments/callback/**")
+                .allowedOriginPatterns("*")
+                .allowedMethods("GET", "POST", "OPTIONS")
+                .allowedHeaders("*")
+                .allowCredentials(false);
+
         registry.addMapping("/**")
-            // Old (kept): hardcoded dev origins
-            // .allowedOrigins(
-            //         "http://localhost:3000",
-            //         "http://127.0.0.1:3000",
-            //         "http://localhost:5500", // Live Server port
-            //         "http://127.0.0.1:5500"
-            // )
-            .allowedOrigins(origins)
+                // Old (kept): hardcoded dev origins
+                // .allowedOrigins(
+                //         "http://localhost:3000",
+                //         "http://127.0.0.1:3000",
+                //         "http://localhost:5500", // Live Server port
+                //         "http://127.0.0.1:5500"
+                // )
+                .allowedOrigins(origins)
                 .allowedMethods("*")
                 .allowedHeaders("*")
                 .allowCredentials(true);
