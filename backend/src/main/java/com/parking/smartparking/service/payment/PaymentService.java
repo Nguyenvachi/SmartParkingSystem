@@ -500,7 +500,18 @@ public class PaymentService {
     }
 
     public String buildFrontendRedirectUrl(PaymentCallbackResult result, HttpServletRequest request) {
-        String base = normalizeUrl(rewriteLocalhostToRequestHost(frontendBaseUrl, request), frontendDashboardPath);
+        String resolvedFrontendBase = rewriteLocalhostToRequestHost(frontendBaseUrl, request);
+        if (resolvedFrontendBase != null && isLocalhostLikeBaseUrl(resolvedFrontendBase)) {
+            String derived = deriveBaseUrlFromRequest(request);
+            if (derived != null && !derived.isBlank() && !isLocalhostLikeBaseUrl(derived)) {
+                resolvedFrontendBase = derived;
+            } else {
+                // Final safety: never redirect users to localhost; use relative redirect on current host.
+                resolvedFrontendBase = null;
+            }
+        }
+
+        String base = normalizeUrl(resolvedFrontendBase, frontendDashboardPath);
         String msg = result.message() != null ? result.message() : "";
 
         return base
