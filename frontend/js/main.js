@@ -127,7 +127,7 @@ function bootstrapOAuthUserFromCurrentUrl() {
 // 2. KHỞI TẠO KHI TRANG LOAD
 // ============================================
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // First priority: hydrate directly from current URL query (independent from other scripts).
     bootstrapOAuthUserFromCurrentUrl();
 
@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Bước 1: Lấy dữ liệu slots ban đầu từ API
     fetchAllSlots();
-    
+
     // Bước 2: Kết nối WebSocket
     connectWebSocket();
 
@@ -262,7 +262,7 @@ async function startGatewayTopUp(provider) {
         });
 
         const data = await res.json();
-        if (res.status === 401) { handleUnauthorized(); return; }
+        if (res.status === 401 || res.status === 403) { handleUnauthorized(res.status); return; }
         if (!res.ok) throw new Error(data.message || 'Không thể tạo yêu cầu thanh toán');
         if (!data.paymentUrl) throw new Error('Gateway không trả về paymentUrl');
 
@@ -313,23 +313,23 @@ function checkTokenAndRedirect() {
 async function fetchAllSlots() {
     try {
         const response = await fetch(`${API_BASE_URL}/slots`);
-        
+
         if (!response.ok) {
             throw new Error(`HTTP error! Status: ${response.status}`);
         }
-        
+
         const slots = await response.json();
 
         slotsData = {};
-        
+
         // Lưu vào object để tra cứu nhanh
         slots.forEach(slot => {
             slotsData[slot.slotName] = slot;
         });
-        
+
         // Render lưới
         renderParkingGrid();
-        
+
     } catch (error) {
         showError('Không thể tải dữ liệu bãi xe. Vui lòng kiểm tra kết nối.');
     }
@@ -342,24 +342,24 @@ async function fetchAllSlots() {
 function renderParkingGrid() {
     const gridContainer = document.getElementById('parking-grid');
     gridContainer.innerHTML = ''; // Xóa loading spinner
-    
+
     const rows = ['A', 'B', 'C', 'D', 'E']; // 5 hàng
     const cols = 4; // 4 cột
-    
+
     rows.forEach(row => {
         // Tạo 1 hàng (div chứa 4 slots)
         const rowDiv = document.createElement('div');
         rowDiv.className = 'd-flex gap-2 justify-content-center';
-        
+
         for (let col = 1; col <= cols; col++) {
             const slotName = `${row}${String(col).padStart(2, '0')}`; // A01, A02, B01...
             const slotDiv = createSlotElement(slotName);
             rowDiv.appendChild(slotDiv);
         }
-        
+
         gridContainer.appendChild(rowDiv);
     });
-    
+
 }
 
 // ============================================
@@ -368,27 +368,27 @@ function renderParkingGrid() {
 
 function createSlotElement(slotName) {
     const slotData = slotsData[slotName] || createPlaceholderSlot(slotName);
-    
+
     const slotDiv = document.createElement('div');
     slotDiv.className = 'parking-slot';
     slotDiv.id = `slot-${slotName}`;
     slotDiv.setAttribute('data-slot-name', slotName);
-    
+
     // Thêm class màu dựa trên status
     slotDiv.classList.add(getStatusClass(slotData.status));
-    
+
     // Nội dung slot
     slotDiv.innerHTML = `
         <div class="slot-name">${slotName}</div>
         <div class="slot-status">${getStatusText(slotData.status)}</div>
     `;
-    
+
     // Event click (để đặt chỗ)
     slotDiv.addEventListener('click', () => {
         const latestSlotData = slotsData[slotName] || createPlaceholderSlot(slotName);
         handleSlotClick(slotName, latestSlotData);
     });
-    
+
     return slotDiv;
 }
 
@@ -551,8 +551,8 @@ async function confirmBooking() {
 
         const data = await res.json();
 
-        if (res.status === 401) {
-            handleUnauthorized();
+        if (res.status === 401 || res.status === 403) {
+            handleUnauthorized(res.status);
             return;
         }
         if (!res.ok) {
@@ -618,7 +618,7 @@ async function openBookingDetails(bookingId) {
             headers: { 'Authorization': `Bearer ${user.token}` }
         });
         const data = await res.json();
-        if (res.status === 401) { handleUnauthorized(); return; }
+        if (res.status === 401 || res.status === 403) { handleUnauthorized(res.status); return; }
         if (!res.ok) throw new Error(data.message || 'Không tải được chi tiết booking');
 
         showQRModal(data);
@@ -644,7 +644,7 @@ async function cancelBooking(bookingId) {
             headers: { 'Authorization': `Bearer ${user.token}` }
         });
         const data = await res.json();
-        if (res.status === 401) { handleUnauthorized(); return; }
+        if (res.status === 401 || res.status === 403) { handleUnauthorized(res.status); return; }
         if (!res.ok) throw new Error(data.message || 'Hủy thất bại');
 
         showToast('warning', `Đã hủy booking #${bookingId}. Slot được trả về trạng thái trống.`);
@@ -674,9 +674,8 @@ async function loadBookingHistory() {
             headers: { 'Authorization': `Bearer ${user.token}` }
         });
         const bookings = await res.json();
-        if (res.status === 401) {
-            const loginUrl = (typeof FRONTEND_LOGIN_URL !== 'undefined' && FRONTEND_LOGIN_URL) ? FRONTEND_LOGIN_URL : 'login.html';
-            container.innerHTML = `<p class="text-warning small text-center">Phiên đăng nhập hết hạn. <a href="${loginUrl}">Đăng nhập lại</a></p>`;
+        if (res.status === 401 || res.status === 403) {
+            handleUnauthorized(res.status);
             return;
         }
         if (!res.ok) throw new Error('Không tải được lịch sử');
@@ -737,7 +736,7 @@ async function loadWalletTransactionsFull() {
             headers: { 'Authorization': `Bearer ${user.token}` }
         });
         const data = await res.json();
-        if (res.status === 401) { handleUnauthorized(); return; }
+        if (res.status === 401 || res.status === 403) { handleUnauthorized(res.status); return; }
         if (!res.ok) throw new Error(data.message || 'Không tải được danh sách giao dịch');
 
         renderWalletTransactions(Array.isArray(data) ? data : []);
@@ -750,13 +749,17 @@ async function loadWalletTransactionsFull() {
 }
 
 function getBookingCardClass(status) {
-    return { PENDING: 'bg-warning bg-opacity-10', CHECKED_IN: 'bg-primary bg-opacity-10',
-             COMPLETED: 'bg-success bg-opacity-10', CANCELLED: 'bg-secondary bg-opacity-10' }[status] || '';
+    return {
+        PENDING: 'bg-warning bg-opacity-10', CHECKED_IN: 'bg-primary bg-opacity-10',
+        COMPLETED: 'bg-success bg-opacity-10', CANCELLED: 'bg-secondary bg-opacity-10'
+    }[status] || '';
 }
 
 function getStatusBadge(status) {
-    return { PENDING: 'bg-warning text-dark', CHECKED_IN: 'bg-primary',
-             COMPLETED: 'bg-success', CANCELLED: 'bg-secondary' }[status] || 'bg-secondary';
+    return {
+        PENDING: 'bg-warning text-dark', CHECKED_IN: 'bg-primary',
+        COMPLETED: 'bg-success', CANCELLED: 'bg-secondary'
+    }[status] || 'bg-secondary';
 }
 
 function formatCurrency(value) {
@@ -832,7 +835,7 @@ async function loadWalletSummary() {
             headers: { 'Authorization': `Bearer ${user.token}` }
         });
         const data = await res.json();
-        if (res.status === 401) { handleUnauthorized(); return; }
+        if (res.status === 401 || res.status === 403) { handleUnauthorized(res.status); return; }
         if (!res.ok) throw new Error(data.message || 'Không tải được ví');
 
         document.getElementById('walletBalanceValue').textContent = formatCurrency(data.walletBalance);
@@ -908,7 +911,7 @@ async function purchaseMembership() {
             })
         });
         const data = await res.json();
-        if (res.status === 401) { handleUnauthorized(); return; }
+        if (res.status === 401 || res.status === 403) { handleUnauthorized(res.status); return; }
         if (!res.ok) throw new Error(data.message || 'Mua vé tháng thất bại');
 
         showToast('success', 'Mua/gia hạn vé tháng thành công.');
@@ -944,7 +947,7 @@ async function withdrawWallet() {
             body: JSON.stringify({ amount, description: descriptionInput.value })
         });
         const data = await res.json();
-        if (res.status === 401) { handleUnauthorized(); return; }
+        if (res.status === 401 || res.status === 403) { handleUnauthorized(res.status); return; }
         if (!res.ok) throw new Error(data.message || 'Rút tiền thất bại');
 
         amountInput.value = '';
@@ -971,7 +974,7 @@ async function loadAvailableVouchers() {
             headers: { 'Authorization': `Bearer ${user.token}` }
         });
         const data = await res.json();
-        if (res.status === 401) { handleUnauthorized(); return; }
+        if (res.status === 401 || res.status === 403) { handleUnauthorized(res.status); return; }
         if (!res.ok) throw new Error(data.message || 'Không tải được voucher');
 
         if (!data || data.length === 0) {
@@ -1016,7 +1019,7 @@ async function simulateOcr() {
             body: formData
         });
         const data = await res.json();
-        if (res.status === 401) { handleUnauthorized(); return; }
+        if (res.status === 401 || res.status === 403) { handleUnauthorized(res.status); return; }
         if (!res.ok) throw new Error(data.message || 'OCR simulation thất bại');
 
         panel.innerHTML = `
@@ -1045,7 +1048,7 @@ function showToast(type, message) {
 /**
  * Xử lý 401: xóa token hết hạn và redirect về login
  */
-function handleUnauthorized() {
+function handleUnauthorized(status = 401) {
     if (unauthorizedRedirectScheduled) {
         return;
     }
@@ -1054,13 +1057,23 @@ function handleUnauthorized() {
     localStorage.removeItem('user');
     const loginUrl = (typeof FRONTEND_LOGIN_URL !== 'undefined' && FRONTEND_LOGIN_URL)
         ? FRONTEND_LOGIN_URL : '/login';
-    try { sessionStorage.setItem('sp_auth_redirect_reason', 'api_401_unauthorized'); } catch (e) { /* ignore */ }
+    const numericStatus = Number(status) || 401;
+    const forbidden = numericStatus === 403;
+    try {
+        sessionStorage.setItem('sp_auth_redirect_reason', forbidden ? 'api_403_forbidden' : 'api_401_unauthorized');
+    } catch (e) {
+        /* ignore */
+    }
     // Đóng tất cả modal đang mở (nếu có)
     document.querySelectorAll('.modal.show').forEach(el => {
         bootstrap.Modal.getInstance(el)?.hide();
     });
-    showToast('warning', '⚠️ Phiên đăng nhập hết hạn. Đang chuyển về trang đăng nhập...');
-    setTimeout(() => { window.location.href = loginUrl + '?reason=expired'; }, 1500);
+    showToast('warning', forbidden
+        ? '⚠️ Bạn không có quyền hoặc phiên đăng nhập không hợp lệ. Đang chuyển về trang đăng nhập...'
+        : '⚠️ Phiên đăng nhập hết hạn. Đang chuyển về trang đăng nhập...');
+    setTimeout(() => {
+        window.location.href = loginUrl + (forbidden ? '?reason=forbidden' : '?reason=expired');
+    }, 1500);
 }
 
 // ============================================
@@ -1070,18 +1083,18 @@ function handleUnauthorized() {
 function connectWebSocket() {
     // Tạo SockJS connection
     const socket = new SockJS(WS_BASE_URL);
-    
+
     // Tạo STOMP client
     stompClient = Stomp.over(socket);
-    
+
     // TẮT DEBUG LOG (tránh spam console)
     stompClient.debug = null;
-    
+
     // Kết nối với timeout 10s
     const connectHeaders = {};
     const connectCallback = onConnected;
     const errorCallback = onError;
-    
+
     stompClient.connect(connectHeaders, connectCallback, errorCallback);
 }
 
@@ -1103,7 +1116,7 @@ function onConnected() {
 
 function onMessageReceived(payload) {
     const message = JSON.parse(payload.body);
-    
+
     // Cập nhật dữ liệu local
     if (message.slotName) {
         if (message.status === 'DELETED') {
@@ -1125,15 +1138,15 @@ function onMessageReceived(payload) {
 function refreshSlotElement(slotName) {
     const slotElement = document.getElementById(`slot-${slotName}`);
     const slotData = slotsData[slotName] || createPlaceholderSlot(slotName);
-    
+
     if (!slotElement) return;
-    
+
     // Xóa tất cả class status cũ
     slotElement.classList.remove('slot-available', 'slot-reserved', 'slot-occupied', 'slot-maintenance');
-    
+
     // Thêm class status mới
     slotElement.classList.add(getStatusClass(slotData.status));
-    
+
     // Cập nhật text status
     const statusElement = slotElement.querySelector('.slot-status');
     if (statusElement) {
@@ -1141,7 +1154,7 @@ function refreshSlotElement(slotName) {
     }
 
     slotElement.dataset.slotStatus = slotData.status;
-    
+
 }
 
 // ============================================
@@ -1150,7 +1163,7 @@ function refreshSlotElement(slotName) {
 
 function onError(error) {
     showToast('warning', 'Mất kết nối real-time. Hệ thống sẽ tự kết nối lại.');
-    
+
     // Thử kết nối lại sau 5 giây
     setTimeout(connectWebSocket, 5000);
 }
