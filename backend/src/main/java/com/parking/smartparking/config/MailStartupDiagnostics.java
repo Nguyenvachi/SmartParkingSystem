@@ -43,12 +43,40 @@ public class MailStartupDiagnostics implements ApplicationRunner {
                 starttls,
                 javaMailSender != null);
 
-        if (enabled && (host == null || host.isBlank() || username == null || username.isBlank())) {
-            log.warn("Mail is enabled but spring.mail.host or spring.mail.username is missing. Local runs need .env loader or application-secrets.properties.");
+        if (!enabled) {
+            return;
         }
 
-        if (enabled && (from == null || from.isBlank())) {
+        boolean hostMissing = (host == null || host.isBlank());
+        boolean usernameMissing = (username == null || username.isBlank());
+        boolean authRequired = Boolean.TRUE.equals(auth);
+
+        if (hostMissing) {
+            log.warn("Mail is enabled but spring.mail.host is missing. In Docker/VPS, set SPRING_MAIL_HOST/PORT/USERNAME/PASSWORD (or point to mailpit for dev).");
+        }
+        if (authRequired && usernameMissing) {
+            log.warn("Mail is enabled and SMTP auth is required, but spring.mail.username is missing.");
+        }
+        if (javaMailSender == null) {
+            log.warn("Mail is enabled but JavaMailSender bean is not available. Check spring.mail.* configuration and that host/port are valid.");
+        }
+        if (from == null || from.isBlank()) {
             log.warn("Mail is enabled but app.mail.from is missing.");
+        }
+
+        String hostTrim = host != null ? host.trim().toLowerCase() : "";
+        if (hostTrim.equals("mailpit") || hostTrim.equals("localhost") || hostTrim.equals("127.0.0.1")) {
+            log.warn("Mail host appears to be a local/dev SMTP (host={}). Emails will NOT reach real inboxes; check Mailpit UI or configure a real SMTP provider.", safe(host));
+        }
+
+        if (hostTrim.equals("smtp.gmail.com") && from != null && !from.isBlank() && username != null && !username.isBlank()) {
+            String fromTrim = from.trim().toLowerCase();
+            String userTrim = username.trim().toLowerCase();
+            if (!fromTrim.equals(userTrim)) {
+                log.warn("Gmail SMTP detected but app.mail.from ({}) differs from spring.mail.username ({}). Gmail often rejects unauthorised 'From' addresses unless configured as an alias.",
+                        safe(from),
+                        safe(username));
+            }
         }
     }
 
