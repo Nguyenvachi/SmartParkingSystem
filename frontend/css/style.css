@@ -281,14 +281,17 @@ a {
 }
 
 .wallet-summary-card {
-    background: #0f172a;
-    color: #ffffff;
+    /* Wallet summary is rendered with a light background (bg-light in HTML).
+       Keep text dark to avoid white-on-light contrast issues. */
+    background: #f8f9fa;
+    color: #0f172a;
+    border: 1px solid rgba(12, 35, 64, 0.08);
 }
 
 .wallet-summary-card .text-muted,
 .wallet-summary-card .small,
 .wallet-summary-card #membershipSummaryText {
-    color: rgba(255, 255, 255, 0.76) !important;
+    color: rgba(15, 23, 42, 0.72) !important;
 }
 
 .membership-card {
