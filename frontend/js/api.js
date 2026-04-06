@@ -46,6 +46,31 @@ async function apiRequest(endpoint, options = {}) {
         }
 
         if (!response.ok) {
+            // Route-guard: if backend says unauthorized/forbidden, clear any tampered session
+            // and force user back to login.
+            if (response.status === 401 || response.status === 403) {
+                try {
+                    if (typeof window !== 'undefined' && typeof window.handleUnauthorized === 'function') {
+                        window.handleUnauthorized(response.status);
+                    } else {
+                        localStorage.removeItem('user');
+                        const loginUrl = (typeof FRONTEND_LOGIN_URL !== 'undefined' && FRONTEND_LOGIN_URL)
+                            ? FRONTEND_LOGIN_URL : '/login';
+                        try {
+                            sessionStorage.setItem(
+                                'sp_auth_redirect_reason',
+                                response.status === 403 ? 'api_403_forbidden' : 'api_401_unauthorized'
+                            );
+                        } catch (_) {
+                            // ignore
+                        }
+                        window.location.href = loginUrl + (response.status === 403 ? '?reason=forbidden' : '?reason=expired');
+                    }
+                } catch (_) {
+                    // ignore
+                }
+            }
+
             const hint = (response.status === 502 || response.status === 503)
                 ? ' (backend/proxy đang lỗi hoặc backend chưa chạy)'
                 : '';
@@ -169,7 +194,9 @@ export function getCurrentUser() {
  */
 export function logout() {
     localStorage.removeItem('user');
-    window.location.href = 'login.html';
+    const loginUrl = (typeof FRONTEND_LOGIN_URL !== 'undefined' && FRONTEND_LOGIN_URL)
+        ? FRONTEND_LOGIN_URL : '/login';
+    window.location.href = loginUrl;
 }
 
 /**

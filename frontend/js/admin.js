@@ -51,9 +51,9 @@ async function adminApiRequest(endpoint, options = {}) {
     const contentType = response.headers.get('content-type') || '';
     const data = contentType.includes('application/json') ? await response.json() : null;
 
-    if (response.status === 401) {
-        handleUnauthorized();
-        throw new Error('Phiên đăng nhập hết hạn.');
+    if (response.status === 401 || response.status === 403) {
+        handleUnauthorized(response.status);
+        throw new Error(response.status === 403 ? 'Bạn không có quyền hoặc phiên đăng nhập không hợp lệ.' : 'Phiên đăng nhập hết hạn.');
     }
 
     if (!response.ok) {

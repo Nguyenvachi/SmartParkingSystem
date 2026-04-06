@@ -35,11 +35,11 @@ async function _profileApi(path, { method = 'GET', body = null } = {}) {
 
     const data = await _parseJsonOrText(res);
 
-    if (res.status === 401) {
+    if (res.status === 401 || res.status === 403) {
         if (typeof handleUnauthorized === 'function') {
-            handleUnauthorized();
+            handleUnauthorized(res.status);
         }
-        throw new Error('Phiên đăng nhập hết hạn.');
+        throw new Error(res.status === 403 ? 'Bạn không có quyền hoặc phiên đăng nhập không hợp lệ.' : 'Phiên đăng nhập hết hạn.');
     }
 
     if (!res.ok) {

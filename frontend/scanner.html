@@ -297,7 +297,10 @@
 
             if (!hasToken) {
                 showToast('Vui lòng đăng nhập để sử dụng Scanner.');
-                setTimeout(() => { window.location.replace('login.html'); }, 800);
+                const loginTarget = (typeof FRONTEND_LOGIN_URL !== 'undefined' && FRONTEND_LOGIN_URL)
+                    ? String(FRONTEND_LOGIN_URL)
+                    : 'login.html';
+                setTimeout(() => { window.location.replace(loginTarget); }, 800);
                 return;
             }
 
@@ -391,6 +394,21 @@
                 payload = null;
             }
 
+            if (res.status === 401 || res.status === 403) {
+                localStorage.removeItem('user');
+                setAuthUi();
+                const loginTarget = (typeof FRONTEND_LOGIN_URL !== 'undefined' && FRONTEND_LOGIN_URL)
+                    ? String(FRONTEND_LOGIN_URL)
+                    : 'login.html';
+                showToast(res.status === 403
+                    ? 'Bạn không có quyền hoặc phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.'
+                    : 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+                setTimeout(() => {
+                    window.location.replace(loginTarget + (res.status === 403 ? '?reason=forbidden' : '?reason=expired'));
+                }, 900);
+                throw new Error('__SP_AUTH_REDIRECT__');
+            }
+
             if (!res.ok) {
                 const opLabel = gateMode === 'checkout' ? 'Check-out' : 'Check-in';
                 const msg = payload?.message || `${opLabel} thất bại (HTTP ${res.status}).`;
@@ -463,6 +481,9 @@
                         showToast(result?.message || `${opLabel} thành công booking #${bookingId}`);
                     } catch (e) {
                         const opLabel = gateMode === 'checkout' ? 'Check-out' : 'Check-in';
+                        if (e?.message === '__SP_AUTH_REDIRECT__') {
+                            return;
+                        }
                         showToast(e?.message || `${opLabel} thất bại.`);
                     }
 
@@ -524,6 +545,9 @@
                 showToast(result?.message || `${opLabel} thành công booking #${bookingId}`);
             } catch (e) {
                 const opLabel = gateMode === 'checkout' ? 'Check-out' : 'Check-in';
+                if (e?.message === '__SP_AUTH_REDIRECT__') {
+                    return;
+                }
                 showToast(e?.message || `${opLabel} thất bại.`);
             }
         });
