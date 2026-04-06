@@ -40,6 +40,15 @@ public class InvoiceService {
     @Value("${app.mail.from:no-reply@smartparking.local}")
     private String mailFrom;
 
+    @Value("${spring.mail.host:}")
+    private String smtpHost;
+
+    @Value("${spring.mail.username:}")
+    private String smtpUsername;
+
+    @Value("${spring.mail.properties.mail.smtp.auth:false}")
+    private boolean smtpAuth;
+
     @Transactional
     public Invoice createAndMaybeSendForCompletedBooking(Booking booking) {
         if (booking == null) {
@@ -107,6 +116,31 @@ public class InvoiceService {
             invoice.setEmailSendError("Không có email người nhận.");
             invoiceRepository.save(invoice);
             log.warn("Invoice email skipped: missing recipient email | invoiceId={} | bookingId={}",
+                    invoice.getId(),
+                    invoice.getBooking() != null ? invoice.getBooking().getId() : null);
+            return;
+        }
+
+        if (smtpHost == null || smtpHost.isBlank()) {
+            invoice.setEmailSendError("SMTP host chưa được cấu hình (spring.mail.host).");
+            invoiceRepository.save(invoice);
+            log.warn("Mail enabled but spring.mail.host is missing; skipping invoice email | invoiceId={} | bookingId={}",
+                    invoice.getId(),
+                    invoice.getBooking() != null ? invoice.getBooking().getId() : null);
+            return;
+        }
+        if (smtpAuth && (smtpUsername == null || smtpUsername.isBlank())) {
+            invoice.setEmailSendError("SMTP username chưa được cấu hình (spring.mail.username).");
+            invoiceRepository.save(invoice);
+            log.warn("Mail enabled and SMTP auth is required, but spring.mail.username is missing; skipping invoice email | invoiceId={} | bookingId={}",
+                    invoice.getId(),
+                    invoice.getBooking() != null ? invoice.getBooking().getId() : null);
+            return;
+        }
+        if (mailFrom == null || mailFrom.isBlank()) {
+            invoice.setEmailSendError("Mail from chưa được cấu hình (app.mail.from).");
+            invoiceRepository.save(invoice);
+            log.warn("Mail enabled but app.mail.from is missing; skipping invoice email | invoiceId={} | bookingId={}",
                     invoice.getId(),
                     invoice.getBooking() != null ? invoice.getBooking().getId() : null);
             return;
