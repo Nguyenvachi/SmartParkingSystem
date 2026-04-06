@@ -117,7 +117,7 @@ public class PasswordResetService {
             mailSender.send(mimeMessage);
             return;
         } catch (Exception e) {
-            log.warn("Failed to send HTML reset-password email to {}: {} ({})", to, e.getMessage(), e.getClass().getSimpleName());
+            log.warn("Failed to send HTML reset-password email to {}", to, e);
         }
 
         try {
@@ -129,7 +129,7 @@ public class PasswordResetService {
             mailSender.send(message);
         } catch (MailException e) {
             // Best-effort: do not fail forgot-password flow on mail issues.
-            log.warn("Failed to send reset-password email to {}: {}", to, e.getMessage());
+            log.warn("Failed to send reset-password email to {}", to, e);
         }
     }
 

@@ -140,9 +140,9 @@ public class InvoiceService {
                 invoiceRepository.save(invoice);
                 return;
             } catch (Exception htmlEx) {
-                log.warn("Failed to send HTML invoice email for booking #{}: {}",
+                log.warn("Failed to send HTML invoice email for booking #{}",
                         invoice.getBooking() != null ? invoice.getBooking().getId() : null,
-                        htmlEx.getMessage() + " (" + htmlEx.getClass().getSimpleName() + ")");
+                        htmlEx);
             }
 
             SimpleMailMessage message = new SimpleMailMessage();
@@ -157,9 +157,9 @@ public class InvoiceService {
             invoice.setEmailSendError(null);
             invoiceRepository.save(invoice);
         } catch (Exception e) {
-            log.warn("Failed to send invoice email for booking #{}: {}",
+            log.warn("Failed to send invoice email for booking #{}",
                     invoice.getBooking() != null ? invoice.getBooking().getId() : null,
-                    e.getMessage());
+                    e);
             invoice.setEmailSendError(e.getMessage());
             invoiceRepository.save(invoice);
         }
