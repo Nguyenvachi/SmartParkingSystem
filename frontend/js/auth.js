@@ -156,7 +156,6 @@ document.getElementById('loginForm')?.addEventListener('submit', async function 
         }
 
     } catch (error) {
-        console.error('❌ Lỗi đăng nhập:', error);
         showAlert('danger', error.message);
 
         // Reset button
@@ -223,7 +222,6 @@ document.getElementById('registerForm')?.addEventListener('submit', async functi
         }
 
     } catch (error) {
-        console.error('❌ Lỗi đăng ký:', error);
         showAlert('danger', error.message);
 
         submitBtn.disabled = false;
@@ -272,7 +270,6 @@ document.getElementById('forgotPasswordForm')?.addEventListener('submit', async 
             setAuthMode('reset');
         }
     } catch (error) {
-        console.error('❌ Lỗi forgot-password:', error);
         showAlert('danger', error.message);
     } finally {
         if (submitBtn) {
@@ -318,7 +315,6 @@ document.getElementById('resetPasswordForm')?.addEventListener('submit', async f
         showAlert('success', data.message || 'Đặt lại mật khẩu thành công.');
         setAuthMode('login');
     } catch (error) {
-        console.error('❌ Lỗi reset-password:', error);
         showAlert('danger', error.message);
     } finally {
         if (submitBtn) {
@@ -354,7 +350,6 @@ function parseJwtPayload(token) {
         const decoded = atob(payloadBase64);
         return JSON.parse(decoded);
     } catch (err) {
-        console.warn('⚠️ Không parse được JWT payload:', err);
         return null;
     }
 }
@@ -389,7 +384,6 @@ function getStoredUser() {
         }
         return JSON.parse(raw);
     } catch (err) {
-        console.warn('⚠️ localStorage user bị lỗi, xóa session cũ', err);
         localStorage.removeItem('user');
         return null;
     }
@@ -434,7 +428,6 @@ function hydrateUserFromOAuth2QueryParams() {
         userData.fullName = formatDisplayName(userData);
 
         if (!hasValidToken(userData)) {
-            console.warn('⚠️ OAuth2 redirect trả về token không hợp lệ hoặc đã hết hạn');
             clearInvalidSession();
             return false;
         }
@@ -444,10 +437,8 @@ function hydrateUserFromOAuth2QueryParams() {
         // Strip query/hash params but keep the current path
         window.history.replaceState({}, document.title, window.location.pathname);
 
-        console.log('✅ Hydrated user from Google OAuth2 redirect');
         return true;
     } catch (err) {
-        console.warn('⚠️ Failed to hydrate user from OAuth2 params:', err);
         return false;
     }
 }
