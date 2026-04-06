@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class VoucherService {
 
     private final VoucherRepository voucherRepository;
@@ -96,6 +97,24 @@ public class VoucherService {
             voucher.setActive(false);
         }
         voucherRepository.save(voucher);
+
+        return new AppliedVoucher(voucher.getCode(), discountAmount);
+    }
+
+    @Transactional(readOnly = true)
+    public AppliedVoucher previewVoucherToAmount(String voucherCode, BigDecimal subtotalAmount) {
+        if (voucherCode == null || voucherCode.isBlank() || subtotalAmount == null || subtotalAmount.signum() <= 0) {
+            return AppliedVoucher.empty();
+        }
+
+        Voucher voucher = voucherRepository.findByCodeIgnoreCase(voucherCode.trim())
+                .orElseThrow(() -> new RuntimeException("Voucher " + voucherCode + " không tồn tại hoặc đã hết hạn."));
+
+        validateVoucher(voucher, subtotalAmount);
+
+        BigDecimal discountAmount = calculateDiscount(voucher, subtotalAmount)
+                .min(subtotalAmount)
+                .setScale(2, RoundingMode.HALF_UP);
 
         return new AppliedVoucher(voucher.getCode(), discountAmount);
     }

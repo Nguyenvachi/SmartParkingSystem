@@ -17,6 +17,9 @@ import jakarta.persistence.LockModeType;
 @Repository
 public interface VoucherRepository extends JpaRepository<Voucher, Long> {
 
+    @Query("select v from Voucher v where lower(v.code) = lower(:code)")
+    Optional<Voucher> findByCodeIgnoreCase(@Param("code") String code);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select v from Voucher v where lower(v.code) = lower(:code)")
     Optional<Voucher> findByCodeForUpdate(@Param("code") String code);

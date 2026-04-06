@@ -9,13 +9,16 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.parking.smartparking.dto.request.ApplyVoucherRequest;
 import com.parking.smartparking.dto.request.BookingRequest;
 import com.parking.smartparking.dto.request.CheckoutRequest;
 import com.parking.smartparking.dto.response.BookingResponse;
+import com.parking.smartparking.dto.response.CheckoutPreviewResponse;
 import com.parking.smartparking.service.BookingService;
 
 import jakarta.validation.Valid;
@@ -90,6 +93,31 @@ public class BookingController {
         String email = authentication.getName();
         BookingResponse booking = bookingService.getBookingById(id, email);
         return ResponseEntity.ok(booking);
+    }
+
+    /**
+     * User applies a voucher to a running booking before reaching the gate.
+     * Staff will then checkout without typing voucher at the gate.
+     */
+    @PutMapping("/{id}/apply-voucher")
+    public ResponseEntity<BookingResponse> applyVoucher(
+            @PathVariable Long id,
+            @RequestBody(required = false) ApplyVoucherRequest request,
+            Authentication authentication) {
+        String email = authentication.getName();
+        BookingResponse response = bookingService.applyVoucher(id, email, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Staff-only checkout preview (no state changes).
+     */
+    @GetMapping("/{id}/checkout-preview")
+    public ResponseEntity<CheckoutPreviewResponse> checkoutPreview(
+            @PathVariable Long id,
+            Authentication authentication) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(bookingService.previewCheckoutAsStaff(id, email));
     }
 
     /**

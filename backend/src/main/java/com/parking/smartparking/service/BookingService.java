@@ -13,9 +13,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.parking.smartparking.controller.WebSocketController;
+import com.parking.smartparking.dto.request.ApplyVoucherRequest;
 import com.parking.smartparking.dto.request.BookingRequest;
 import com.parking.smartparking.dto.request.CheckoutRequest;
 import com.parking.smartparking.dto.response.BookingResponse;
+import com.parking.smartparking.dto.response.CheckoutPreviewResponse;
 import com.parking.smartparking.dto.response.ParkingSlotResponse;
 import com.parking.smartparking.entity.Booking;
 import com.parking.smartparking.entity.ParkingSlot;
@@ -47,6 +49,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 @Slf4j
 public class BookingService {
 
@@ -279,7 +282,7 @@ public class BookingService {
 
     @Transactional
     public BookingResponse checkOut(Long bookingId, String userEmail, CheckoutRequest request) {
-        Booking booking = bookingRepository.findByIdAndUser_Email(bookingId, userEmail)
+        Booking booking = bookingRepository.findByIdAndUserEmailForUpdate(bookingId, userEmail)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy booking #" + bookingId));
 
         if (booking.getStatus() != Booking.BookingStatus.CHECKED_IN) {
@@ -296,9 +299,8 @@ public class BookingService {
         PricingService.PricingResult pricingResult = pricingService.calculateCheckoutAmount(booking, user, checkOutTime);
 
         BigDecimal subtotalAmount = pricingResult.totalAmount();
-        VoucherService.AppliedVoucher appliedVoucher = voucherService.applyVoucherToAmount(
-                request != null ? request.getVoucherCode() : null,
-                subtotalAmount);
+        String voucherCode = resolveVoucherCodeForCheckout(booking, request);
+        VoucherService.AppliedVoucher appliedVoucher = applyVoucherBestEffort(voucherCode, subtotalAmount);
 
         BigDecimal totalAmount = subtotalAmount.subtract(appliedVoucher.discountAmount());
         if (totalAmount.signum() > 0) {
@@ -348,7 +350,7 @@ public class BookingService {
      */
     @Transactional
     public BookingResponse checkOutAsStaff(Long bookingId, String staffEmail, CheckoutRequest request) {
-        Booking booking = bookingRepository.findById(bookingId)
+        Booking booking = bookingRepository.findByIdForUpdate(bookingId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy booking #" + bookingId));
 
         if (booking.getStatus() != Booking.BookingStatus.CHECKED_IN) {
@@ -365,9 +367,8 @@ public class BookingService {
         PricingService.PricingResult pricingResult = pricingService.calculateCheckoutAmount(booking, user, checkOutTime);
 
         BigDecimal subtotalAmount = pricingResult.totalAmount();
-        VoucherService.AppliedVoucher appliedVoucher = voucherService.applyVoucherToAmount(
-                request != null ? request.getVoucherCode() : null,
-                subtotalAmount);
+        String voucherCode = resolveVoucherCodeForCheckout(booking, request);
+        VoucherService.AppliedVoucher appliedVoucher = applyVoucherBestEffort(voucherCode, subtotalAmount);
 
         BigDecimal totalAmount = subtotalAmount.subtract(appliedVoucher.discountAmount());
         if (totalAmount.signum() > 0) {
@@ -413,6 +414,110 @@ public class BookingService {
                 totalAmount);
 
         return toResponse(booking, checkoutMessage);
+    }
+
+    @Transactional
+    public BookingResponse applyVoucher(Long bookingId, String userEmail, ApplyVoucherRequest request) {
+        Booking booking = bookingRepository.findByIdAndUser_Email(bookingId, userEmail)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy booking #" + bookingId));
+
+        if (booking.getStatus() != Booking.BookingStatus.CHECKED_IN) {
+            throw new RuntimeException("Chỉ có thể áp voucher cho booking đang ở trạng thái CHECKED_IN.");
+        }
+
+        String rawCode = request != null ? request.getVoucherCode() : null;
+        String normalizedCode = (rawCode == null || rawCode.isBlank()) ? null : rawCode.trim();
+
+        if (normalizedCode == null) {
+            booking.setAppliedVoucherCode(null);
+            bookingRepository.save(booking);
+            return toResponse(booking, "Đã bỏ áp dụng voucher cho booking #" + bookingId);
+        }
+
+        User user = booking.getUser();
+        PricingService.PricingResult pricingResult = pricingService.calculateCheckoutAmount(booking, user, LocalDateTime.now());
+        BigDecimal subtotalAmount = pricingResult.totalAmount();
+
+        VoucherService.AppliedVoucher preview = voucherService.previewVoucherToAmount(normalizedCode, subtotalAmount);
+        booking.setAppliedVoucherCode(preview.code());
+        bookingRepository.save(booking);
+
+        return toResponse(
+                booking,
+                String.format(
+                        "Đã áp dụng voucher %s (ước tính giảm %s VND tại thời điểm hiện tại).",
+                        preview.code(),
+                        preview.discountAmount().toPlainString()));
+    }
+
+    @Transactional(readOnly = true)
+    public CheckoutPreviewResponse previewCheckoutAsStaff(Long bookingId, String staffEmail) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy booking #" + bookingId));
+
+        if (booking.getStatus() != Booking.BookingStatus.CHECKED_IN) {
+            throw new RuntimeException(
+                    "Chỉ có thể preview check-out booking ở trạng thái CHECKED_IN (hiện tại: " + booking.getStatus() + ")");
+        }
+
+        User user = booking.getUser();
+        LocalDateTime now = LocalDateTime.now();
+        PricingService.PricingResult pricingResult = pricingService.calculateCheckoutAmount(booking, user, now);
+
+        BigDecimal subtotalAmount = pricingResult.totalAmount();
+        String voucherCode = resolveVoucherCodeForCheckout(booking, null);
+
+        VoucherService.AppliedVoucher appliedVoucher;
+        String note = pricingResult.note();
+        try {
+            appliedVoucher = voucherService.previewVoucherToAmount(voucherCode, subtotalAmount);
+        } catch (RuntimeException ex) {
+            appliedVoucher = VoucherService.AppliedVoucher.empty();
+            if (voucherCode != null && !voucherCode.isBlank()) {
+                note = (note != null && !note.isBlank())
+                        ? (note + " | Voucher không khả dụng")
+                        : "Voucher không khả dụng";
+            }
+        }
+
+        BigDecimal totalAmount = subtotalAmount.subtract(appliedVoucher.discountAmount());
+        if (totalAmount.signum() < 0) {
+            totalAmount = BigDecimal.ZERO;
+        }
+
+        return CheckoutPreviewResponse.builder()
+                .bookingId(booking.getId())
+                .userId(user.getId())
+                .userFullName(user.getFullName())
+                .slotName(booking.getParkingSlot().getSlotName())
+                .vehiclePlate(booking.getVehiclePlate())
+                .subtotalAmount(subtotalAmount)
+                .discountAmount(appliedVoucher.discountAmount())
+                .totalAmount(totalAmount)
+                .appliedVoucherCode(appliedVoucher.code())
+                .note(note)
+                .build();
+    }
+
+    private String resolveVoucherCodeForCheckout(Booking booking, CheckoutRequest request) {
+        String fromRequest = (request != null) ? request.getVoucherCode() : null;
+        if (fromRequest != null && !fromRequest.isBlank()) {
+            return fromRequest.trim();
+        }
+
+        String attached = booking != null ? booking.getAppliedVoucherCode() : null;
+        return (attached != null && !attached.isBlank()) ? attached.trim() : null;
+    }
+
+    private VoucherService.AppliedVoucher applyVoucherBestEffort(String voucherCode, BigDecimal subtotalAmount) {
+        if (voucherCode == null || voucherCode.isBlank()) {
+            return VoucherService.AppliedVoucher.empty();
+        }
+        try {
+            return voucherService.applyVoucherToAmount(voucherCode, subtotalAmount);
+        } catch (RuntimeException ex) {
+            return VoucherService.AppliedVoucher.empty();
+        }
     }
 
     /**

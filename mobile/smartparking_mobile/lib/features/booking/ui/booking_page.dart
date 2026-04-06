@@ -116,6 +116,109 @@ class _BookingPageState extends State<BookingPage> {
     }
   }
 
+  Future<void> _applyVoucher(Booking booking) async {
+    if (booking.status != 'CHECKED_IN') {
+      _toast('Chỉ áp voucher cho vé đang sử dụng (CHECKED_IN).');
+      return;
+    }
+
+    List<dynamic> vouchers;
+    try {
+      final data = await _api.get('/vouchers/available');
+      vouchers = (data as List).toList();
+    } on ApiException catch (e) {
+      _toast(e.message);
+      return;
+    } catch (_) {
+      _toast('Không tải được danh sách voucher.');
+      return;
+    }
+
+    final codes = vouchers
+        .whereType<Map>()
+        .map((e) => (e as Map).cast<String, dynamic>())
+        .map((e) => e['code']?.toString() ?? '')
+        .where((c) => c.trim().isNotEmpty)
+        .toList();
+
+    if (codes.isEmpty) {
+      _toast('Chưa có voucher khả dụng.');
+      return;
+    }
+
+    String selected = booking.appliedVoucherCode?.trim().isNotEmpty == true
+        ? booking.appliedVoucherCode!.trim()
+        : codes.first;
+
+    final action = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('Áp voucher cho Booking #${booking.bookingId}'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: selected,
+                    items: codes
+                        .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                        .toList(),
+                    onChanged: (v) => setState(() => selected = v ?? selected),
+                    decoration: const InputDecoration(labelText: 'Voucher'),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Gợi ý: áp voucher trước khi ra cổng để bảo vệ chỉ cần quét và xác nhận.',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: Colors.black54),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, 'cancel'),
+                  child: const Text('Hủy'),
+                ),
+                if (booking.appliedVoucherCode != null &&
+                    booking.appliedVoucherCode!.trim().isNotEmpty)
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, 'clear'),
+                    child: const Text('Bỏ voucher'),
+                  ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, 'apply'),
+                  child: const Text('Áp dụng'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (action == null || action == 'cancel') return;
+
+    try {
+      final body =
+          action == 'clear' ? {'voucherCode': ''} : {'voucherCode': selected};
+      final data = await _api
+          .put('/bookings/${booking.bookingId}/apply-voucher', body: body);
+      _toast(data is Map && data['message'] is String
+          ? data['message'] as String
+          : 'Cập nhật voucher thành công.');
+      await _load();
+    } on ApiException catch (e) {
+      _toast(e.message);
+    } catch (_) {
+      _toast('Cập nhật voucher thất bại.');
+    }
+  }
+
   String _normalizeBase64(String raw) {
     final trimmed = raw.trim();
     final comma = trimmed.indexOf(',');
@@ -215,11 +318,20 @@ class _BookingPageState extends State<BookingPage> {
                   child: ListTile(
                     title: Text('Booking #${b.bookingId} | ${b.slotName}'),
                     subtitle: Text(
-                      'Status: ${b.status}${b.vehiclePlate != null ? ' | Plate: ${b.vehiclePlate}' : ''}',
+                      'Status: ${b.status}'
+                      '${b.vehiclePlate != null ? ' | Plate: ${b.vehiclePlate}' : ''}'
+                      '${b.appliedVoucherCode != null && b.appliedVoucherCode!.trim().isNotEmpty ? ' | Voucher: ${b.appliedVoucherCode}' : ''}',
                     ),
                     trailing: Wrap(
                       spacing: 8,
                       children: [
+                        IconButton(
+                          onPressed: b.status == 'CHECKED_IN'
+                              ? () => _applyVoucher(b)
+                              : null,
+                          icon: const Icon(Icons.local_offer),
+                          tooltip: 'Áp voucher',
+                        ),
                         IconButton(
                           onPressed: (b.qrCodeBase64 != null &&
                                   b.qrCodeBase64!.isNotEmpty)
