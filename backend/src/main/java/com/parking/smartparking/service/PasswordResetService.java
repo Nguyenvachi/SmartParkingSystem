@@ -51,6 +51,15 @@ public class PasswordResetService {
     @Value("${app.mail.from:no-reply@smartparking.local}")
     private String mailFrom;
 
+    @Value("${spring.mail.host:}")
+    private String smtpHost;
+
+    @Value("${spring.mail.username:}")
+    private String smtpUsername;
+
+    @Value("${spring.mail.properties.mail.smtp.auth:false}")
+    private boolean smtpAuth;
+
     @Transactional
     public ForgotPasswordResponse createResetToken(String email) {
         // Tránh lộ thông tin tồn tại user: luôn trả OK.
@@ -94,6 +103,19 @@ public class PasswordResetService {
             return;
         }
         if (rawToken == null || rawToken.isBlank()) {
+            return;
+        }
+
+        if (smtpHost == null || smtpHost.isBlank()) {
+            log.warn("Mail enabled but spring.mail.host is missing; skipping reset-password email");
+            return;
+        }
+        if (smtpAuth && (smtpUsername == null || smtpUsername.isBlank())) {
+            log.warn("Mail enabled and SMTP auth is required, but spring.mail.username is missing; skipping reset-password email");
+            return;
+        }
+        if (mailFrom == null || mailFrom.isBlank()) {
+            log.warn("Mail enabled but app.mail.from is missing; skipping reset-password email");
             return;
         }
 
