@@ -66,9 +66,11 @@ public class SecurityConfig {
                 // Gate/Guard operations must be staff-only
                 .requestMatchers(HttpMethod.POST, "/api/bookings/*/checkin").hasAnyAuthority("ROLE_ADMIN", "ROLE_BRANCH_ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/bookings/*/checkout").hasAnyAuthority("ROLE_ADMIN", "ROLE_BRANCH_ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/bookings/*/checkout-preview").hasAnyAuthority("ROLE_ADMIN", "ROLE_BRANCH_ADMIN")
                 // User-only modules: booking creation/history/cancel + wallet operations
                 .requestMatchers(HttpMethod.POST, "/api/bookings").hasAuthority("ROLE_USER")
                 .requestMatchers(HttpMethod.GET, "/api/bookings").hasAuthority("ROLE_USER")
+                .requestMatchers(HttpMethod.PUT, "/api/bookings/*/apply-voucher").hasAuthority("ROLE_USER")
                 .requestMatchers(HttpMethod.DELETE, "/api/bookings/*").hasAuthority("ROLE_USER")
                 // Allow both user & staff to fetch a specific booking (scanner validation)
                 .requestMatchers(HttpMethod.GET, "/api/bookings/*").hasAnyAuthority("ROLE_USER", "ROLE_ADMIN", "ROLE_BRANCH_ADMIN")

@@ -5,6 +5,7 @@ class Booking {
   final String status;
   final String? vehiclePlate;
   final String? qrCodeBase64;
+  final String? appliedVoucherCode;
 
   Booking({
     required this.bookingId,
@@ -13,6 +14,7 @@ class Booking {
     required this.status,
     this.vehiclePlate,
     this.qrCodeBase64,
+    this.appliedVoucherCode,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class Booking {
       status: (json['status'] ?? '') as String,
       vehiclePlate: json['vehiclePlate'] as String?,
       qrCodeBase64: json['qrCodeBase64'] as String?,
+      appliedVoucherCode: json['appliedVoucherCode'] as String?,
     );
   }
 }

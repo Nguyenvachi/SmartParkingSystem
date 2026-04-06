@@ -195,6 +195,56 @@
                 </div>
             </div>
         </div>
+
+        <!-- Checkout confirmation modal (Staff) -->
+        <div class="modal fade" id="checkoutModal" tabindex="-1" aria-labelledby="checkoutModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="checkoutModalLabel"><i class="bi bi-receipt me-2"></i>Xác nhận Check-out</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="small text-muted">Booking</div>
+                        <div class="mono mb-2" id="cmBooking">-</div>
+
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <div class="small text-muted">Slot</div>
+                                <div class="mono" id="cmSlot">-</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="small text-muted">Biển số</div>
+                                <div class="mono" id="cmPlate">-</div>
+                            </div>
+                        </div>
+
+                        <hr class="my-3" />
+
+                        <div class="d-flex justify-content-between">
+                            <div class="text-muted">Tiền gốc</div>
+                            <div class="fw-semibold" id="cmSubtotal">-</div>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <div class="text-muted">Giảm giá <span class="small" id="cmVoucher"></span></div>
+                            <div class="fw-semibold" id="cmDiscount">-</div>
+                        </div>
+                        <div class="d-flex justify-content-between mt-2">
+                            <div class="fw-bold">Thực thu</div>
+                            <div class="fw-bold" id="cmTotal">-</div>
+                        </div>
+
+                        <div class="small text-muted mt-2" id="cmNote"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Hủy</button>
+                        <button type="button" class="btn btn-brand" id="btnConfirmCheckout">
+                            <i class="bi bi-check2-circle me-1"></i>Xác nhận Check-out
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -345,6 +395,99 @@
 
         let gateMode = 'checkin';
 
+        const checkoutModalEl = document.getElementById('checkoutModal');
+        const checkoutModal = checkoutModalEl ? new bootstrap.Modal(checkoutModalEl, { backdrop: 'static' }) : null;
+        let pendingCheckoutBookingId = null;
+        let checkoutConfirmInFlight = false;
+
+        function formatVnd(amount) {
+            const n = Number(amount || 0);
+            try {
+                return new Intl.NumberFormat('vi-VN').format(n) + ' VND';
+            } catch (_) {
+                return String(n) + ' VND';
+            }
+        }
+
+        function setCheckoutModalLoading(loading) {
+            const btn = document.getElementById('btnConfirmCheckout');
+            if (!btn) return;
+            btn.disabled = !!loading;
+        }
+
+        async function fetchCheckoutPreview(bookingId) {
+            const session = readSession();
+            const token = session?.token;
+            if (!token) {
+                showToast('Chưa đăng nhập. Vui lòng đăng nhập Web trước.');
+                throw new Error('NO_TOKEN');
+            }
+
+            const url = `${apiBase}/bookings/${bookingId}/checkout-preview`;
+            const res = await fetch(url, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            let payload = null;
+            try {
+                payload = await res.json();
+            } catch (_) {
+                payload = null;
+            }
+
+            if (res.status === 401 || res.status === 403) {
+                localStorage.removeItem('user');
+                setAuthUi();
+                const loginTarget = (typeof FRONTEND_LOGIN_URL !== 'undefined' && FRONTEND_LOGIN_URL)
+                    ? String(FRONTEND_LOGIN_URL)
+                    : 'login.html';
+                showToast(res.status === 403
+                    ? 'Bạn không có quyền hoặc phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.'
+                    : 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+                setTimeout(() => {
+                    window.location.replace(loginTarget + (res.status === 403 ? '?reason=forbidden' : '?reason=expired'));
+                }, 900);
+                throw new Error('__SP_AUTH_REDIRECT__');
+            }
+
+            if (!res.ok) {
+                const msg = payload?.message || `Không preview được check-out (HTTP ${res.status}).`;
+                throw new Error(msg);
+            }
+
+            return payload;
+        }
+
+        function openCheckoutConfirm(preview) {
+            if (!checkoutModal) {
+                throw new Error('Không khởi tạo được modal Checkout.');
+            }
+
+            const bookingId = preview?.bookingId;
+            pendingCheckoutBookingId = bookingId;
+
+            document.getElementById('cmBooking').textContent = bookingId ? `#${bookingId}` : '-';
+            document.getElementById('cmSlot').textContent = preview?.slotName || '-';
+            document.getElementById('cmPlate').textContent = preview?.vehiclePlate || '-';
+            document.getElementById('cmSubtotal').textContent = formatVnd(preview?.subtotalAmount);
+            document.getElementById('cmDiscount').textContent = '-' + formatVnd(preview?.discountAmount);
+            document.getElementById('cmTotal').textContent = formatVnd(preview?.totalAmount);
+
+            const voucherLabel = document.getElementById('cmVoucher');
+            if (voucherLabel) {
+                voucherLabel.textContent = preview?.appliedVoucherCode ? `(voucher ${preview.appliedVoucherCode})` : '';
+            }
+
+            const noteEl = document.getElementById('cmNote');
+            if (noteEl) {
+                noteEl.textContent = preview?.note || '';
+            }
+
+            setCheckoutModalLoading(false);
+            checkoutModal.show();
+        }
+
         function setGateMode(mode) {
             gateMode = (mode === 'checkout') ? 'checkout' : 'checkin';
             const pill = document.getElementById('modePillText');
@@ -422,6 +565,38 @@
         let scanner = null;
         let scanning = false;
 
+        function resumeScanIfPossible() {
+            scanning = true;
+            try { scanner && scanner.start(); } catch (_) { /* ignore */ }
+        }
+
+        if (checkoutModalEl) {
+            checkoutModalEl.addEventListener('hidden.bs.modal', () => {
+                pendingCheckoutBookingId = null;
+                checkoutConfirmInFlight = false;
+                resumeScanIfPossible();
+            });
+        }
+
+        document.getElementById('btnConfirmCheckout').addEventListener('click', async () => {
+            if (!pendingCheckoutBookingId || checkoutConfirmInFlight) return;
+            checkoutConfirmInFlight = true;
+            setCheckoutModalLoading(true);
+
+            try {
+                const result = await callGateAction(pendingCheckoutBookingId);
+                showToast(result?.message || `Check-out thành công booking #${pendingCheckoutBookingId}`);
+                try { checkoutModal && checkoutModal.hide(); } catch (_) { /* ignore */ }
+            } catch (e) {
+                if (e?.message === '__SP_AUTH_REDIRECT__') {
+                    return;
+                }
+                showToast(e?.message || 'Check-out thất bại.');
+                checkoutConfirmInFlight = false;
+                setCheckoutModalLoading(false);
+            }
+        });
+
         async function startScanner() {
             if (scanning) return;
 
@@ -476,20 +651,23 @@
                     try { scanner && scanner.stop(); } catch (_) { /* ignore */ }
 
                     try {
+                        if (gateMode === 'checkout') {
+                            const preview = await fetchCheckoutPreview(bookingId);
+                            openCheckoutConfirm(preview);
+                            return;
+                        }
+
                         const result = await callGateAction(bookingId);
-                        const opLabel = gateMode === 'checkout' ? 'Check-out' : 'Check-in';
-                        showToast(result?.message || `${opLabel} thành công booking #${bookingId}`);
+                        showToast(result?.message || `Check-in thành công booking #${bookingId}`);
                     } catch (e) {
-                        const opLabel = gateMode === 'checkout' ? 'Check-out' : 'Check-in';
                         if (e?.message === '__SP_AUTH_REDIRECT__') {
                             return;
                         }
-                        showToast(e?.message || `${opLabel} thất bại.`);
+                        showToast(e?.message || 'Thao tác thất bại.');
                     }
 
                     // resume for next scan
-                    scanning = true;
-                    try { scanner && scanner.start(); } catch (_) { /* ignore */ }
+                    resumeScanIfPossible();
                 };
 
                 scanner = new QrScanner(videoEl, onDecode, {
@@ -540,15 +718,19 @@
 
             document.getElementById('lastBooking').textContent = String(bookingId);
             try {
+                if (gateMode === 'checkout') {
+                    const preview = await fetchCheckoutPreview(bookingId);
+                    openCheckoutConfirm(preview);
+                    return;
+                }
+
                 const result = await callGateAction(bookingId);
-                const opLabel = gateMode === 'checkout' ? 'Check-out' : 'Check-in';
-                showToast(result?.message || `${opLabel} thành công booking #${bookingId}`);
+                showToast(result?.message || `Check-in thành công booking #${bookingId}`);
             } catch (e) {
-                const opLabel = gateMode === 'checkout' ? 'Check-out' : 'Check-in';
                 if (e?.message === '__SP_AUTH_REDIRECT__') {
                     return;
                 }
-                showToast(e?.message || `${opLabel} thất bại.`);
+                showToast(e?.message || 'Thao tác thất bại.');
             }
         });
 

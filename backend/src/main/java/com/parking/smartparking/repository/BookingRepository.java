@@ -6,11 +6,14 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.parking.smartparking.entity.Booking;
+
+import jakarta.persistence.LockModeType;
 
 /**
  * Repository cho Entity Booking
@@ -23,6 +26,14 @@ import com.parking.smartparking.entity.Booking;
  */
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select b from Booking b where b.id = :id")
+    Optional<Booking> findByIdForUpdate(@Param("id") Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select b from Booking b where b.id = :id and b.user.email = :email")
+    Optional<Booking> findByIdAndUserEmailForUpdate(@Param("id") Long id, @Param("email") String email);
 
     /**
      * Tìm các booking đã hết hạn (Dùng cho Scheduler - Tech Key #2)
