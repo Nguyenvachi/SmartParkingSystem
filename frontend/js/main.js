@@ -785,6 +785,11 @@ function switchSidebarTab(tabId) {
     if (tabId === 'tabWallet') {
         loadWalletSummary();
     }
+    if (tabId === 'tabProfile') {
+        if (typeof loadProfileTab === 'function') {
+            loadProfileTab();
+        }
+    }
 }
 
 async function loadRecommendation(vehicleType = null) {

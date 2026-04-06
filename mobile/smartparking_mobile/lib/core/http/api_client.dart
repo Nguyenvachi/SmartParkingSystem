@@ -18,14 +18,13 @@ class ApiClient {
   final http.Client _http;
 
   ApiClient({TokenStorage? tokenStorage, http.Client? httpClient})
-    : _tokenStorage = tokenStorage ?? TokenStorage(),
-      _http = httpClient ?? http.Client();
+      : _tokenStorage = tokenStorage ?? TokenStorage(),
+        _http = httpClient ?? http.Client();
 
   Uri _uri(String path) {
     final base = ApiConfig.baseUrl;
-    final normalizedBase = base.endsWith('/')
-        ? base.substring(0, base.length - 1)
-        : base;
+    final normalizedBase =
+        base.endsWith('/') ? base.substring(0, base.length - 1) : base;
     final normalizedPath = path.startsWith('/') ? path : '/$path';
     return Uri.parse('$normalizedBase$normalizedPath');
   }
@@ -53,6 +52,15 @@ class ApiClient {
 
   Future<dynamic> post(String path, {Object? body, bool auth = true}) async {
     final res = await _http.post(
+      _uri(path),
+      headers: await _headers(auth: auth),
+      body: jsonEncode(body ?? {}),
+    );
+    return _handle(res);
+  }
+
+  Future<dynamic> put(String path, {Object? body, bool auth = true}) async {
+    final res = await _http.put(
       _uri(path),
       headers: await _headers(auth: auth),
       body: jsonEncode(body ?? {}),

@@ -81,7 +81,7 @@ class _RootRouterState extends State<RootRouter> {
     final pages = <Widget>[
       const DashboardPage(),
       const BookingPage(),
-      const ProfilePage(),
+      ProfilePage(onLogout: _logout),
     ];
 
     return Scaffold(
@@ -123,9 +123,6 @@ class _RootRouterState extends State<RootRouter> {
             ),
           ],
         ),
-        actions: [
-          IconButton(onPressed: _logout, icon: const Icon(Icons.logout)),
-        ],
       ),
       body: pages[_index],
       bottomNavigationBar: NavigationBar(
