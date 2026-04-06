@@ -72,6 +72,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.DELETE, "/api/bookings/*").hasAuthority("ROLE_USER")
                 // Allow both user & staff to fetch a specific booking (scanner validation)
                 .requestMatchers(HttpMethod.GET, "/api/bookings/*").hasAnyAuthority("ROLE_USER", "ROLE_ADMIN", "ROLE_BRANCH_ADMIN")
+                .requestMatchers("/api/users/me/**").hasAuthority("ROLE_USER")
+                .requestMatchers("/api/vehicles/**").hasAuthority("ROLE_USER")
                 .requestMatchers("/api/wallet/**").hasAuthority("ROLE_USER")
                 .requestMatchers(HttpMethod.GET, "/api/audit-logs/**").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/admin/summary").hasAnyAuthority("ROLE_ADMIN", "ROLE_BRANCH_ADMIN")

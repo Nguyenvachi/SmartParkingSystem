@@ -37,6 +37,7 @@
                     <li class="nav-item"><a class="nav-link active" href="#">Bãi xe</a></li>
                     <li class="nav-item user-only"><a class="nav-link" href="#" onclick="switchSidebarTab('tabHistory'); return false;">Lịch sử</a></li>
                     <li class="nav-item user-only"><a class="nav-link" href="#" onclick="switchSidebarTab('tabWallet'); return false;">Ví</a></li>
+                    <li class="nav-item user-only"><a class="nav-link" href="#" onclick="switchSidebarTab('tabProfile'); return false;">Profile</a></li>
                     <li class="nav-item d-none" id="navScannerItem"><a class="nav-link" href="scanner.html"><i class="bi bi-qr-code-scan me-1"></i>Scanner</a></li>
                     <li class="nav-item d-none" id="navAdminItem"><a class="nav-link" href="#" onclick="scrollToAdminConsole(); return false;">Admin</a></li>
                 </ul>
@@ -104,6 +105,12 @@
                                 <button class="nav-link user-only" data-bs-toggle="tab" data-bs-target="#tabWallet"
                                     onclick="loadWalletSummary()">
                                     <i class="bi bi-wallet2 me-1"></i>Ví
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link user-only" data-bs-toggle="tab" data-bs-target="#tabProfile"
+                                    onclick="loadProfileTab()">
+                                    <i class="bi bi-person-lines-fill me-1"></i>Profile
                                 </button>
                             </li>
                         </ul>
@@ -249,6 +256,107 @@
                                             onclick="loadAvailableVouchers()">Tải lại</button>
                                     </div>
                                     <div id="voucherListPanel" class="small text-muted">Đang tải voucher...</div>
+                                </div>
+                            </div>
+
+                            <!-- Tab Profile -->
+                            <div class="tab-pane fade user-only" id="tabProfile">
+                                <p class="text-muted text-center small py-2" id="profileTabHint">Nhấn tab để tải hồ sơ.</p>
+
+                                <div id="profileTabContent" class="d-none">
+                                    <div class="side-section-block">
+                                        <h6 class="mb-2"><i class="bi bi-person-badge me-1"></i>Thông tin cá nhân</h6>
+                                        <form id="profileMeForm" class="dashboard-form-card">
+                                            <div class="mb-2">
+                                                <label class="form-label small">Email</label>
+                                                <input type="text" class="form-control form-control-sm" id="profileEmail" disabled>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label small">Họ tên</label>
+                                                <input type="text" class="form-control form-control-sm" id="profileFullName" required>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label small">Số điện thoại</label>
+                                                <input type="text" class="form-control form-control-sm" id="profilePhoneNumber">
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label small">Avatar URL</label>
+                                                <input type="text" class="form-control form-control-sm" id="profileAvatarUrl">
+                                            </div>
+                                            <button type="submit" class="btn btn-primary btn-sm w-100">
+                                                <i class="bi bi-save me-1"></i>Lưu
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                    <div class="side-section-block mt-3">
+                                        <h6 class="mb-2"><i class="bi bi-car-front-fill me-1"></i>Phương tiện của tôi</h6>
+                                        <form id="vehicleAddForm" class="dashboard-form-card mb-2">
+                                            <div class="input-group input-group-sm mb-2">
+                                                <input type="text" class="form-control" id="vehiclePlateNumber" placeholder="Biển số (vd 29A12345)">
+                                                <select class="form-select" id="vehicleType">
+                                                    <option value="MOTORBIKE">Xe máy</option>
+                                                    <option value="CAR">Ô tô</option>
+                                                </select>
+                                            </div>
+                                            <input type="text" class="form-control form-control-sm mb-2" id="vehicleColor" placeholder="Màu (optional)">
+                                            <button type="submit" class="btn btn-success btn-sm w-100">
+                                                <i class="bi bi-plus-circle me-1"></i>Thêm phương tiện
+                                            </button>
+                                        </form>
+                                        <div id="vehicleList"></div>
+                                    </div>
+
+                                    <div class="side-section-block mt-3">
+                                        <h6 class="mb-2"><i class="bi bi-wallet2 me-1"></i>Ví & thanh toán</h6>
+                                        <div class="card border-0 bg-light wallet-summary-card">
+                                            <div class="card-body p-3">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div>
+                                                        <div class="text-muted small">Số dư ví</div>
+                                                        <div class="fs-5 fw-bold text-success" id="profileWalletBalanceValue">0 VND</div>
+                                                        <div class="small mt-1" id="profileMembershipPlanText">Chưa có gói.</div>
+                                                        <div class="small text-muted mt-2" id="profileRecentTransactions"></div>
+                                                    </div>
+                                                    <button class="btn btn-outline-secondary btn-sm" onclick="switchSidebarTab('tabWallet'); return false;">Mở tab Ví</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="side-section-block mt-3">
+                                        <h6 class="mb-2"><i class="bi bi-clock-history me-1"></i>Lịch sử hoạt động</h6>
+                                        <div id="profileRecentBookings"></div>
+                                        <button class="btn btn-outline-secondary btn-sm w-100" onclick="switchSidebarTab('tabHistory'); return false;">Mở tab Lịch sử</button>
+                                    </div>
+
+                                    <div class="side-section-block mt-3">
+                                        <h6 class="mb-2"><i class="bi bi-shield-lock-fill me-1"></i>Cài đặt & bảo mật</h6>
+
+                                        <form id="profileSettingsForm" class="dashboard-form-card mb-3">
+                                            <div class="form-check form-switch mb-2">
+                                                <input class="form-check-input" type="checkbox" id="settingEmailEnabled">
+                                                <label class="form-check-label small" for="settingEmailEnabled">Thông báo Email</label>
+                                            </div>
+                                            <div class="form-check form-switch mb-2">
+                                                <input class="form-check-input" type="checkbox" id="settingPushEnabled">
+                                                <label class="form-check-label small" for="settingPushEnabled">Thông báo Push</label>
+                                            </div>
+                                            <button type="submit" class="btn btn-outline-primary btn-sm w-100">
+                                                <i class="bi bi-sliders me-1"></i>Lưu cài đặt
+                                            </button>
+                                        </form>
+
+                                        <form id="changePasswordForm" class="dashboard-form-card">
+                                            <label class="form-label small fw-semibold">Đổi mật khẩu</label>
+                                            <input type="password" class="form-control form-control-sm mb-2" id="changeCurrentPassword" placeholder="Nhập mật khẩu hiện tại">
+                                            <input type="password" class="form-control form-control-sm mb-2" id="changeNewPassword" placeholder="Mật khẩu mới (>=6 ký tự)" required>
+                                            <input type="password" class="form-control form-control-sm mb-2" id="changeConfirmPassword" placeholder="Xác nhận mật khẩu mới" required>
+                                            <button type="submit" class="btn btn-danger btn-sm w-100">
+                                                <i class="bi bi-key me-1"></i>Đổi mật khẩu
+                                            </button>
+                                        </form>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -693,6 +801,7 @@
     <!-- Main Dashboard Logic -->
     <script src="js/main.js?v=20260318e"></script>
     <script src="js/admin.js?v=20260318b"></script>
+    <script src="js/profile.js?v=20260406a"></script>
 
     <!-- Phase 3: Khởi tạo UI sau khi DOM load -->
     <script>

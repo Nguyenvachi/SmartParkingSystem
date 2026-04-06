@@ -58,6 +58,17 @@ public class User {
     @Column(name = "avatar_url", columnDefinition = "TEXT")
     private String avatarUrl;
 
+    @Column(name = "phone_number", length = 30)
+    private String phoneNumber;
+
+    @Builder.Default
+    @Column(name = "notification_email_enabled", nullable = false, columnDefinition = "boolean default true")
+    private Boolean notificationEmailEnabled = true;
+
+    @Builder.Default
+    @Column(name = "notification_push_enabled", nullable = false, columnDefinition = "boolean default true")
+    private Boolean notificationPushEnabled = true;
+
     @Builder.Default
     @Column(name = "is_email_verified", nullable = false)
     private Boolean isEmailVerified = false;
