@@ -14,17 +14,17 @@ const API_CONFIG = {
  */
 async function apiRequest(endpoint, options = {}) {
     const url = `${API_CONFIG.BASE_URL}${endpoint}`;
-    
+
     const defaultHeaders = {
         'Content-Type': 'application/json'
     };
-    
+
     // Thêm Authorization header nếu user đã đăng nhập
     const user = JSON.parse(localStorage.getItem('user') || 'null');
     if (user && user.token) {
         defaultHeaders['Authorization'] = `Bearer ${user.token}`;
     }
-    
+
     const config = {
         ...options,
         headers: {
@@ -32,7 +32,7 @@ async function apiRequest(endpoint, options = {}) {
             ...options.headers
         }
     };
-    
+
     try {
         const response = await fetch(url, config);
         const contentType = (response.headers.get('content-type') || '').toLowerCase();
@@ -44,18 +44,17 @@ async function apiRequest(endpoint, options = {}) {
             // Nginx 502/503 often returns HTML; keep it readable.
             data = { message: text ? String(text).slice(0, 500) : '' };
         }
-        
+
         if (!response.ok) {
             const hint = (response.status === 502 || response.status === 503)
                 ? ' (backend/proxy đang lỗi hoặc backend chưa chạy)'
                 : '';
             throw new Error((data && data.message ? data.message : `HTTP error! status: ${response.status}`) + hint);
         }
-        
+
         return { success: true, data };
-        
+
     } catch (error) {
-        console.error(`❌ API Error [${endpoint}]:`, error);
         return { success: false, error: error.message };
     }
 }
@@ -76,7 +75,7 @@ export const AuthAPI = {
             body: JSON.stringify({ fullName, email, password })
         });
     },
-    
+
     /**
      * Đăng nhập
      */
@@ -104,7 +103,7 @@ export const SlotAPI = {
             method: 'GET'
         });
     },
-    
+
     /**
      * Lấy thông tin 1 slot theo ID
      */
@@ -113,7 +112,7 @@ export const SlotAPI = {
             method: 'GET'
         });
     },
-    
+
     /**
      * Tạo slot mới (Admin only)
      */
@@ -123,7 +122,7 @@ export const SlotAPI = {
             body: JSON.stringify(slotData)
         });
     },
-    
+
     /**
      * Cập nhật slot (Admin only)
      */
@@ -133,7 +132,7 @@ export const SlotAPI = {
             body: JSON.stringify(slotData)
         });
     },
-    
+
     /**
      * Xóa slot (Admin only)
      */

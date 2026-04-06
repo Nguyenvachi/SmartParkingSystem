@@ -119,7 +119,6 @@ function bootstrapOAuthUserFromCurrentUrl() {
         window.history.replaceState({}, document.title, window.location.pathname);
         return true;
     } catch (e) {
-        console.warn('⚠️ bootstrapOAuthUserFromCurrentUrl failed:', e);
         return false;
     }
 }
@@ -129,19 +128,13 @@ function bootstrapOAuthUserFromCurrentUrl() {
 // ============================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Smart Parking Dashboard đã load');
-
     // First priority: hydrate directly from current URL query (independent from other scripts).
     bootstrapOAuthUserFromCurrentUrl();
 
     // Google OAuth2 redirect returns token in query params.
     // Hydrate localStorage BEFORE we enforce token presence.
     if (typeof hydrateUserFromOAuth2QueryParams === 'function') {
-        try {
-            hydrateUserFromOAuth2QueryParams();
-        } catch (e) {
-            console.warn('⚠️ OAuth2 hydrate failed:', e);
-        }
+        try { hydrateUserFromOAuth2QueryParams(); } catch (_) { /* ignore */ }
     }
 
     // Kiểm tra token hết hạn ngay khi load trang
@@ -303,7 +296,6 @@ function checkTokenAndRedirect() {
 
     const tokenValid = (typeof hasValidToken === 'function') ? hasValidToken(user) : true;
     if (!tokenValid) {
-        console.warn('⚠️ Token không hợp lệ hoặc đã hết hạn. Đang chuyển về trang đăng nhập...');
         localStorage.removeItem('user');
         const loginUrl = (typeof FRONTEND_LOGIN_URL !== 'undefined' && FRONTEND_LOGIN_URL)
             ? FRONTEND_LOGIN_URL : '/login';
@@ -327,7 +319,6 @@ async function fetchAllSlots() {
         }
         
         const slots = await response.json();
-        console.log('✅ Đã tải', slots.length, 'slots từ server');
 
         slotsData = {};
         
@@ -340,7 +331,6 @@ async function fetchAllSlots() {
         renderParkingGrid();
         
     } catch (error) {
-        console.error('❌ Lỗi khi tải slots:', error);
         showError('Không thể tải dữ liệu bãi xe. Vui lòng kiểm tra kết nối.');
     }
 }
@@ -370,7 +360,6 @@ function renderParkingGrid() {
         gridContainer.appendChild(rowDiv);
     });
     
-    console.log('🎨 Đã render lưới bãi xe');
 }
 
 // ============================================
@@ -1079,8 +1068,6 @@ function handleUnauthorized() {
 // ============================================
 
 function connectWebSocket() {
-    console.log('🔌 Đang kết nối WebSocket...');
-    
     // Tạo SockJS connection
     const socket = new SockJS(WS_BASE_URL);
     
@@ -1103,8 +1090,6 @@ function connectWebSocket() {
 // ============================================
 
 function onConnected() {
-    console.log('✅ WebSocket đã kết nối!');
-    
     // Subscribe topic để nhận update
     stompClient.subscribe('/topic/parking-updates', onMessageReceived);
 
@@ -1118,7 +1103,6 @@ function onConnected() {
 
 function onMessageReceived(payload) {
     const message = JSON.parse(payload.body);
-    console.log('📨 Nhận được update:', message);
     
     // Cập nhật dữ liệu local
     if (message.slotName) {
@@ -1142,10 +1126,7 @@ function refreshSlotElement(slotName) {
     const slotElement = document.getElementById(`slot-${slotName}`);
     const slotData = slotsData[slotName] || createPlaceholderSlot(slotName);
     
-    if (!slotElement) {
-        console.warn('⚠️ Không tìm thấy slot element:', slotName);
-        return;
-    }
+    if (!slotElement) return;
     
     // Xóa tất cả class status cũ
     slotElement.classList.remove('slot-available', 'slot-reserved', 'slot-occupied', 'slot-maintenance');
@@ -1161,7 +1142,6 @@ function refreshSlotElement(slotName) {
 
     slotElement.dataset.slotStatus = slotData.status;
     
-    console.log(`🎨 Đã cập nhật slot ${slotName} -> ${slotData.status}`);
 }
 
 // ============================================
@@ -1169,7 +1149,6 @@ function refreshSlotElement(slotName) {
 // ============================================
 
 function onError(error) {
-    console.error('❌ Lỗi WebSocket:', error);
     showToast('warning', 'Mất kết nối real-time. Hệ thống sẽ tự kết nối lại.');
     
     // Thử kết nối lại sau 5 giây
