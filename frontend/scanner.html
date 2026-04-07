@@ -43,6 +43,14 @@
 
         #qr-reader {
             width: 100%;
+            position: relative;
+        }
+
+        /* qr-scanner may inject overlay elements; ensure they never block modal/button clicks */
+        #qr-reader .scan-region-highlight,
+        #qr-reader .scan-region-highlight-svg,
+        #qr-reader canvas {
+            pointer-events: none !important;
         }
 
         #qr-video {
@@ -673,8 +681,9 @@
                 scanner = new QrScanner(videoEl, onDecode, {
                     // Prefer rear camera when possible
                     preferredCamera: 'environment',
-                    highlightScanRegion: true,
-                    highlightCodeOutline: true,
+                    // Disable overlays to avoid click-blocking layers on some browsers.
+                    highlightScanRegion: false,
+                    highlightCodeOutline: false,
                     maxScansPerSecond: 10
                 });
 
@@ -719,6 +728,9 @@
             document.getElementById('lastBooking').textContent = String(bookingId);
             try {
                 if (gateMode === 'checkout') {
+                    // Pause scanner while modal is open (avoid duplicate scans / click-blocking overlays)
+                    scanning = false;
+                    try { scanner && scanner.stop(); } catch (_) { /* ignore */ }
                     const preview = await fetchCheckoutPreview(bookingId);
                     openCheckoutConfirm(preview);
                     return;
