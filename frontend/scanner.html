@@ -573,6 +573,37 @@
             checkoutModal.show();
         }
 
+        async function checkoutWithNativeConfirm(bookingId) {
+            const preview = await fetchCheckoutPreview(bookingId);
+
+            const lines = [];
+            lines.push(`Booking #${preview?.bookingId ?? bookingId}`);
+            if (preview?.slotName) lines.push(`Slot: ${preview.slotName}`);
+            if (preview?.vehiclePlate) lines.push(`Biển số: ${preview.vehiclePlate}`);
+            lines.push('');
+            lines.push(`Tiền gốc: ${formatVnd(preview?.subtotalAmount)}`);
+            if (preview?.appliedVoucherCode) {
+                lines.push(`Voucher: ${preview.appliedVoucherCode}`);
+            }
+            lines.push(`Giảm giá: -${formatVnd(preview?.discountAmount)}`);
+            lines.push(`Thực thu: ${formatVnd(preview?.totalAmount)}`);
+            if (preview?.note) {
+                lines.push('');
+                lines.push(String(preview.note));
+            }
+
+            // Native confirm is above any page overlays -> cannot be click-blocked.
+            const ok = window.confirm(lines.join('\n'));
+            if (!ok) {
+                showToast('Đã hủy check-out.');
+                return null;
+            }
+
+            const result = await callGateAction(bookingId);
+            showToast(result?.message || `Check-out thành công booking #${bookingId}`);
+            return result;
+        }
+
         function setGateMode(mode) {
             gateMode = (mode === 'checkout') ? 'checkout' : 'checkin';
             const pill = document.getElementById('modePillText');
@@ -755,8 +786,8 @@
 
                     try {
                         if (gateMode === 'checkout') {
-                            const preview = await fetchCheckoutPreview(bookingId);
-                            openCheckoutConfirm(preview);
+                            await checkoutWithNativeConfirm(bookingId);
+                            resumeScanIfPossible();
                             return;
                         }
 
@@ -826,8 +857,8 @@
                     // Pause scanner while modal is open (avoid duplicate scans / click-blocking overlays)
                     scanning = false;
                     try { scanner && scanner.stop(); } catch (_) { /* ignore */ }
-                    const preview = await fetchCheckoutPreview(bookingId);
-                    openCheckoutConfirm(preview);
+                    await checkoutWithNativeConfirm(bookingId);
+                    resumeScanIfPossible();
                     return;
                 }
 
