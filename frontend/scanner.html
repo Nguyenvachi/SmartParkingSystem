@@ -47,10 +47,30 @@
         }
 
         /* qr-scanner may inject overlay elements; ensure they never block modal/button clicks */
-        #qr-reader .scan-region-highlight,
-        #qr-reader .scan-region-highlight-svg,
-        #qr-reader canvas {
+        .scan-region-highlight,
+        .scan-region-highlight-svg,
+        .code-outline-highlight {
             pointer-events: none !important;
+            z-index: 0 !important;
+        }
+
+        /* Keep scanner visuals behind any dialogs */
+        #qr-reader,
+        #qr-video {
+            z-index: 0;
+        }
+
+        #qr-video {
+            pointer-events: none;
+        }
+
+        /* Hard guarantee: modal/backdrop must sit above any injected overlays */
+        .modal {
+            z-index: 20000;
+        }
+
+        .modal-backdrop {
+            z-index: 19990;
         }
 
         #qr-video {
@@ -432,10 +452,23 @@
             }
 
             const url = `${apiBase}/bookings/${bookingId}/checkout-preview`;
-            const res = await fetch(url, {
-                method: 'GET',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 12000);
+            let res;
+            try {
+                res = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    signal: controller.signal
+                });
+            } catch (e) {
+                if (e?.name === 'AbortError') {
+                    throw new Error('Preview check-out bị timeout. Vui lòng thử lại.');
+                }
+                throw e;
+            } finally {
+                clearTimeout(timeoutId);
+            }
 
             let payload = null;
             try {
@@ -467,10 +500,54 @@
             return payload;
         }
 
+        function neutralizeQrOverlays() {
+            try {
+                // Known qr-scanner overlays
+                document.querySelectorAll('.scan-region-highlight, .scan-region-highlight-svg, .code-outline-highlight').forEach((el) => {
+                    try {
+                        el.style.pointerEvents = 'none';
+                        el.style.zIndex = '0';
+                    } catch (_) { /* ignore */ }
+                });
+
+                // Generic: any injected highlight/scan overlay should never capture clicks.
+                document.querySelectorAll('[class]').forEach((el) => {
+                    try {
+                        const cls = String(el.className || '').toLowerCase();
+                        if (!cls) return;
+                        if (cls.includes('scan-region') || cls.includes('highlight') || cls.includes('code-outline')) {
+                            el.style.pointerEvents = 'none';
+                            el.style.zIndex = '0';
+                        }
+                    } catch (_) { /* ignore */ }
+                });
+
+                // Defensive: if any fixed-position canvas ends up above the UI, disable hit-testing.
+                document.querySelectorAll('canvas').forEach((c) => {
+                    try {
+                        const s = window.getComputedStyle(c);
+                        if (s.position === 'fixed' || s.position === 'absolute') {
+                            // Only touch canvases that look like overlays (full-screen-ish)
+                            const w = c.width || 0;
+                            const h = c.height || 0;
+                            if ((w >= window.innerWidth * 0.6 && h >= window.innerHeight * 0.6) || s.inset === '0px') {
+                                c.style.pointerEvents = 'none';
+                                c.style.zIndex = '0';
+                            }
+                        }
+                    } catch (_) { /* ignore */ }
+                });
+            } catch (_) {
+                // ignore
+            }
+        }
+
         function openCheckoutConfirm(preview) {
             if (!checkoutModal) {
                 throw new Error('Không khởi tạo được modal Checkout.');
             }
+
+            neutralizeQrOverlays();
 
             const bookingId = preview?.bookingId;
             pendingCheckoutBookingId = bookingId;
@@ -529,14 +606,28 @@
             const action = gateMode === 'checkout' ? 'checkout' : 'checkin';
             const url = `${apiBase}/bookings/${bookingId}/${action}`;
 
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: '{}' // keep explicit body to avoid some proxies stripping POST without body
-            });
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 12000);
+            let res;
+            try {
+                res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: '{}', // keep explicit body to avoid some proxies stripping POST without body
+                    signal: controller.signal
+                });
+            } catch (e) {
+                if (e?.name === 'AbortError') {
+                    const opLabel = gateMode === 'checkout' ? 'Check-out' : 'Check-in';
+                    throw new Error(`${opLabel} bị timeout. Vui lòng thử lại.`);
+                }
+                throw e;
+            } finally {
+                clearTimeout(timeoutId);
+            }
 
             let payload = null;
             try {
@@ -583,6 +674,10 @@
                 pendingCheckoutBookingId = null;
                 checkoutConfirmInFlight = false;
                 resumeScanIfPossible();
+            });
+
+            checkoutModalEl.addEventListener('shown.bs.modal', () => {
+                neutralizeQrOverlays();
             });
         }
 
