@@ -1,4 +1,4 @@
-const CACHE_NAME = 'smartparking-cache-v4';
+const CACHE_NAME = 'smartparking-cache-v6';
 
 const CORE_ASSETS = [
     '/',
