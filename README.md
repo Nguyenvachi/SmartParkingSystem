@@ -1,7 +1,7 @@
 # SmartParkingSystem
 J2EE &amp; Tester
 
-## Run with Docker (recommended)
+## Docker Containers Setup (recommended)
 
 Prerequisites: Docker Desktop.
 
