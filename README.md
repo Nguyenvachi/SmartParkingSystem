@@ -1,64 +1,141 @@
-# SmartParkingSystem
-J2EE &amp; Tester
+# Smart Parking System
 
-## Run with Docker (recommended)
+## Overview
 
-Prerequisites: Docker Desktop.
+Smart Parking System is an academic full-stack project for reserving parking slots and managing gate check-in/check-out. It combines a Spring Boot API, a static web client, and a Flutter end-user application, with Docker Compose for a reproducible local environment.
 
-```bash
+The OCR screen is explicitly a simulation: it derives a mock plate result from the uploaded file name. It is not an OCR model or a production license-plate recognition service.
+
+## Key Features
+
+- Email/password authentication, JWT authorization, password reset, and optional Google sign-in.
+- Parking-slot browsing and recommendation by vehicle type.
+- Booking creation, cancellation, scheduled expiry, pricing, and booking history.
+- HMAC-signed QR tickets with gate check-in/check-out restricted to administrative roles.
+- Wallet transactions, vouchers, membership rules, invoices, and optional sandbox payment adapters.
+- User vehicle/profile management, blacklists, audit logging, and WebSocket updates.
+- Static responsive web interface for users and gate staff.
+- Flutter client for authentication, slots, bookings, wallet information, and profiles.
+
+## Tech Stack
+
+| Area | Technologies |
+| --- | --- |
+| Backend | Java 21, Spring Boot 3.5, Spring Security, Spring Data JPA |
+| Authentication | JWT, optional Google OAuth 2.0 |
+| Database | MySQL 8; H2 for automated tests |
+| Web client | HTML, CSS, JavaScript, Bootstrap, Nginx |
+| Mobile client | Flutter, Dart, secure storage |
+| Supporting libraries | ZXing QR code generation, WebSocket, Spring Mail |
+| Local environment | Docker Compose, Mailpit, optional phpMyAdmin |
+
+## Project Structure
+
+```text
+SmartParkingSystem/
+├── backend/                    Spring Boot REST API and tests
+├── frontend/                   Static web client and gate scanner
+├── mobile/smartparking_mobile/ Flutter end-user application
+├── infra/                      Optional reverse-proxy configuration
+└── docker-compose.yml          Local multi-service environment
+```
+
+## Prerequisites
+
+For the complete local stack:
+
+- Docker Desktop with Docker Compose
+
+For running components separately:
+
+- Java 21
+- MySQL 8
+- Flutter with a Dart 3-compatible SDK
+
+## Configuration
+
+Copy the safe template and replace every `CHANGE_ME` value:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+At minimum, Docker Compose requires independent values for:
+
+- `MYSQL_ROOT_PASSWORD`
+- `APP_JWT_SECRET` (at least 32 characters)
+- `APP_QR_SECRET` (a different value, at least 32 characters)
+
+Payment, SMTP, and Google OAuth settings are optional and disabled or empty by default. Do not commit `.env`, real gateway credentials, OAuth client secrets, or mail passwords.
+
+## Running with Docker
+
+```powershell
 docker compose up --build
 ```
 
-## Email (Gmail SMTP) notes
+Default local endpoints:
 
-- Docker Compose sẽ tự load file `.env` ở root.
-- Khi chạy backend local bằng `mvnw.cmd spring-boot:run` / IDE, backend cũng sẽ tự đọc `.env` (best-effort) để map `SPRING_MAIL_*` → `spring.mail.*`.
-	- Cách khuyến nghị (an toàn hơn): cấu hình mail trong `backend/application-secrets.properties` (file này đã được ignore bởi Git),
-		hoặc set environment variables khi chạy.
+| Service | URL |
+| --- | --- |
+| Web client | `http://localhost:3000` |
+| Backend API | `http://localhost:8080/api` |
+| Mailpit inbox | `http://localhost:8025` |
+| phpMyAdmin | `http://localhost:8081` |
 
-## Deploy on VPS
+The password-reset token is not exposed by default. Set `APP_PASSWORD_RESET_EXPOSE_TOKEN=true` only for an isolated local demonstration.
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for a copy-paste VPS + DNS + `.env` checklist.
+## Running Components Separately
 
-You can start from the template [.env.vps.example](.env.vps.example) (copy it to `.env` on the VPS and fill values).
+Backend:
 
-- Frontend: http://localhost:3000 (clean URLs: `/login`, `/dashboard`)
-- Backend API: http://localhost:8080/api
-- MySQL: localhost:3306 (db: `smartparking_db`, user: `root`, pass: `root`)
-- phpMyAdmin: http://localhost:8081 (user: `root`, pass: `root`, server/host: `mysql`)
-
-### Google Login (OAuth2)
-
-If you see Google error `401: invalid_client` after switching to Docker, set these in a root `.env` file (same folder as `docker-compose.yml`):
-
-```env
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
+```powershell
+cd backend
+.\mvnw.cmd spring-boot:run
 ```
 
-Then apply the change (recreate backend):
+Provide `DB_PASSWORD`, `APP_JWT_SECRET`, and `APP_QR_SECRET` through environment variables before starting the backend.
 
-```bash
-docker compose up -d --force-recreate backend
+Flutter client on an Android emulator:
+
+```powershell
+cd mobile\smartparking_mobile
+flutter pub get
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080/api
 ```
 
-### Notes
+Use `http://localhost:8080/api` for Flutter web/Windows or your computer's LAN address for a physical device.
 
-- Password reset demo mode is enabled by default in compose via `APP_PASSWORD_RESET_EXPOSE_TOKEN=true`.
-- To disable demo token exposure when deploying: set `APP_PASSWORD_RESET_EXPOSE_TOKEN=false`.
+## Verification
 
-## Gate / barrier flow (Guard-controlled)
+```powershell
+cd backend
+.\mvnw.cmd test
 
-- User (mobile/web) chỉ đặt chỗ và xuất trình QR.
-- Check-in và Check-out chỉ thực hiện tại cổng (bảo vệ) qua `scanner.html`.
-- Backend đã chặn user thường gọi API `POST /api/bookings/{id}/checkin|checkout` (chỉ `ROLE_ADMIN`/`ROLE_BRANCH_ADMIN`).
+cd ..\mobile\smartparking_mobile
+flutter analyze
+```
 
-## End-to-end test script
+## Gate Workflow
 
-1) Start stack: `docker compose up --build`
-2) Login user (ROLE_USER) trên web hoặc mobile
-3) Create booking (status `PENDING`) và mở QR
-4) Login staff (ROLE_ADMIN / ROLE_BRANCH_ADMIN) trên web
-5) Open `http://localhost:3000/scanner.html`
-6) Mode `Check-in` → scan QR → booking chuyển `CHECKED_IN`, slot `OCCUPIED`
-7) Mode `Check-out` → scan lại QR → booking chuyển `COMPLETED`, slot `AVAILABLE` (ví bị trừ nếu có phí)
+1. A user reserves an available slot and receives a signed QR ticket.
+2. Gate staff open `http://localhost:3000/scanner.html` with an authorized account.
+3. Check-in changes the booking to `CHECKED_IN` and the slot to `OCCUPIED`.
+4. Check-out completes the booking, releases the slot, and applies the configured charge rules.
+
+## Known Limitations
+
+- OCR is a deterministic simulation, not image recognition.
+- Gateway integrations require separate sandbox accounts and public callback URLs.
+- Google sign-in, SMTP, and HTTPS need external configuration not included in the repository.
+- The web client is a static JavaScript application rather than a bundled frontend framework.
+- The current Flutter client has static analysis but no automated test suite yet.
+- The project has not undergone a production security or load assessment.
+
+## Project Status
+
+Completed academic project maintained for portfolio demonstrations and further learning.
+
+## Author
+
+Nguyễn Chí Thanh

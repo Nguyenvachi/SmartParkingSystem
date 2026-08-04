@@ -136,7 +136,7 @@ class _BookingPageState extends State<BookingPage> {
 
     final codes = vouchers
         .whereType<Map>()
-        .map((e) => (e as Map).cast<String, dynamic>())
+        .map((e) => e.cast<String, dynamic>())
         .map((e) => e['code']?.toString() ?? '')
         .where((c) => c.trim().isNotEmpty)
         .toList();
@@ -150,6 +150,8 @@ class _BookingPageState extends State<BookingPage> {
         ? booking.appliedVoucherCode!.trim()
         : codes.first;
 
+    if (!mounted) return;
+
     final action = await showDialog<String>(
       context: context,
       builder: (context) {
@@ -162,7 +164,7 @@ class _BookingPageState extends State<BookingPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   DropdownButtonFormField<String>(
-                    value: selected,
+                    initialValue: selected,
                     items: codes
                         .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                         .toList(),
