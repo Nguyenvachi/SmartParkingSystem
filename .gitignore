@@ -6,3 +6,9 @@ backend/application-secrets.properties
 
 # Optional local-only files
 *.log
+
+# IDE, generated, and downloaded dependency artifacts
+.vscode/
+.tmp_html5qr/
+**/target/
+**/build/
